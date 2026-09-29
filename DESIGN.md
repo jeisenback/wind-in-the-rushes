@@ -51,6 +51,22 @@ The styles form their own triangle: Stone beats Storm, Storm beats Stream,
 Stream beats Stone (about 55-60% each, random play). Every style sits between
 47% and 52% overall.
 
+## Weapons
+
+A weapon adds to or subtracts from the damage of whole families. Special
+cards are never modified. You pick yours; the AI picks at random.
+
+| Weapon | Strike | Guard | Flow |
+|---|---|---|---|
+| Sword | 0 | 0 | 0 |
+| Greatblade | +1 | 0 | -1 |
+| Staff | -1 | +2 | 0 |
+| Twin Knives | 0 | -1 | +1 |
+
+Each weapon averages 49-51% across all loadouts. Matching a weapon to your
+style pays off (Stone + Staff about 62%, Storm + Greatblade about 58%);
+mismatching costs (Storm + Staff about 40%).
+
 ## Balance
 
 Average net damage of each card against a random card from the Balanced deck
@@ -64,5 +80,4 @@ Random card from hand, weighted 3:1 toward cards that beat the family you played
 
 ## Later, not now
 
-- Weapons as per-family damage modifiers
 - AI that reads your discard pile

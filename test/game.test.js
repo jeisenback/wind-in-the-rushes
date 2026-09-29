@@ -38,7 +38,7 @@ test('broken blade costs its user', () => {
 
 test('full games end with a winner', () => {
   for (let i = 0; i < 200; i++) {
-    const s = newGame('storm', 'stone');
+    const s = newGame({ style: 'storm', weapon: 'greatblade' }, { style: 'stone', weapon: 'knives' });
     while (!s.over) playRound(s, 0, aiChoose(s));
     assert.ok(['player', 'ai', 'draw'].includes(s.winner));
     assert.ok(s.round <= 13);
@@ -51,4 +51,16 @@ test('every style has a 12-card deck of known cards', () => {
     assert.equal(style.deck.length, 12);
     for (const id of style.deck) assert.ok(CARDS[id], id);
   }
+});
+
+test('weapons modify family damage but not specials', () => {
+  const { cardDamage } = require('../game.js');
+  assert.equal(cardDamage('hawk', 'greatblade'), 5);
+  assert.equal(cardDamage('sparrow', 'greatblade'), 2);
+  assert.equal(cardDamage('willow', 'staff'), 5);
+  assert.equal(cardDamage('crane', 'staff'), 7);
+  const r = resolve('hawk', 'hawk', 'greatblade', 'staff');
+  assert.deepEqual([r.toA, r.toB], [3, 5]);
+  const g = resolve('sparrow', 'gate', 'knives', 'sword');
+  assert.deepEqual([g.toA, g.toB], [0, 3]); // 3 + 1 knives - 1 gate
 });

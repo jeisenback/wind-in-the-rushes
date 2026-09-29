@@ -44,7 +44,7 @@
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   @media (max-width: 600px) { .row { grid-template-columns: 1fr; } .card { width: calc(50% - 4px); } }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
-  #newGame, #style { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);
+  #newGame, #style, #weapon { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);
              background: var(--panel); color: var(--ink); cursor: pointer; }
 </style>
 </head>
@@ -55,6 +55,8 @@
   <div class="controls">
     <label for="style">Your style</label>
     <select id="style"></select>
+    <label for="weapon">Weapon</label>
+    <select id="weapon"></select>
     <button id="newGame">New game</button>
   </div>
 
@@ -87,12 +89,23 @@
   const $ = (id) => document.getElementById(id);
   let state;
   const styleIds = Object.keys(STYLES);
+  const weaponIds = Object.keys(WEAPONS);
   $('style').innerHTML = styleIds.map((id) => `<option value="${id}">${STYLES[id].name}</option>`).join('');
+  $('weapon').innerHTML = weaponIds.map((id) => `<option value="${id}">${weaponSummary(id)}</option>`).join('');
+  const randomOf = (list) => list[Math.floor(Math.random() * list.length)];
 
   function start() {
-    const aiStyle = styleIds[Math.floor(Math.random() * styleIds.length)];
-    state = newGame($('style').value, aiStyle);
+    state = newGame(
+      { style: $('style').value, weapon: $('weapon').value },
+      { style: randomOf(styleIds), weapon: randomOf(weaponIds) },
+    );
     render();
+  }
+
+  // Weapon name plus its family modifiers, e.g. "Staff (guard +2, strike -1)".
+  function weaponSummary(id) {
+    const mods = Object.entries(WEAPONS[id].mods).map(([f, m]) => `${f} ${m > 0 ? '+' : ''}${m}`);
+    return mods.length ? `${WEAPONS[id].name} (${mods.join(', ')})` : WEAPONS[id].name;
   }
 
   // Style name plus how many cards of each family its deck holds.
@@ -117,15 +130,15 @@
     $('aHp').textContent = `${Math.max(0, ai.hp)} / ${START_HP}`;
     $('pBar').style.width = `${Math.max(0, p.hp) / START_HP * 100}%`;
     $('aBar').style.width = `${Math.max(0, ai.hp) / START_HP * 100}%`;
-    $('pMeta').textContent = `${styleSummary(p.style)} | Deck: ${p.deck.length}`;
-    $('aMeta').textContent = `${styleSummary(ai.style)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}`;
+    $('pMeta').textContent = `${styleSummary(p.style)} | ${weaponSummary(p.weapon)} | Deck: ${p.deck.length}`;
+    $('aMeta').textContent = `${styleSummary(ai.style)} | ${weaponSummary(ai.weapon)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}`;
     $('aHand').innerHTML = ai.hand.map(() => '<div class="back"></div>').join('');
     $('pPile').innerHTML = p.discard.map(chip).join('');
     $('aPile').innerHTML = ai.discard.map(chip).join('');
     $('pHand').innerHTML = p.hand.map((id, i) => {
       const c = CARDS[id];
       return `<button class="card ${c.family}" data-i="${i}" ${state.over ? 'disabled' : ''}>
-        <div class="fam">${c.family} | ${c.damage} dmg</div>
+        <div class="fam">${c.family} | ${cardDamage(id, state.player.weapon)} dmg</div>
         <div class="name">${c.name}</div>
         <div class="text">${c.text}</div>
       </button>`;

@@ -26,6 +26,21 @@ const STYLES = {
   stream:   { name: 'Stream',   deck: ['hawk', 'needle', 'gate', 'willow', 'mist', 'mist', 'mist', 'sparrow', 'sparrow', 'sparrow', 'crane', 'blade'] },
 };
 
+// A weapon adds to or subtracts from the damage of one or more families.
+// Special cards are never modified.
+const WEAPONS = {
+  sword:      { name: 'Sword',       mods: {} },
+  greatblade: { name: 'Greatblade',  mods: { strike: 1, flow: -1 } },
+  staff:      { name: 'Staff',       mods: { guard: 2, strike: -1 } },
+  knives:     { name: 'Twin Knives', mods: { flow: 1, guard: -1 } },
+};
+
+// Damage a card deals when wielded with the given weapon.
+function cardDamage(cardId, weaponId = 'sword') {
+  const card = CARDS[cardId];
+  return Math.max(0, card.damage + (WEAPONS[weaponId].mods[card.family] || 0));
+}
+
 function shuffle(list, rng) {
   const a = list.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -35,31 +50,34 @@ function shuffle(list, rng) {
   return a;
 }
 
-function newFighter(styleId, rng) {
-  const deck = shuffle(STYLES[styleId].deck, rng);
-  return { style: styleId, hp: START_HP, hand: deck.splice(0, HAND_SIZE), deck, discard: [] };
+function newFighter({ style = 'balanced', weapon = 'sword' } = {}, rng) {
+  const deck = shuffle(STYLES[style].deck, rng);
+  return { style, weapon, hp: START_HP, hand: deck.splice(0, HAND_SIZE), deck, discard: [] };
 }
 
-function newGame(playerStyle = 'balanced', aiStyle = 'balanced', rng = Math.random) {
-  return { player: newFighter(playerStyle, rng), ai: newFighter(aiStyle, rng), round: 1, log: [], over: false, winner: null };
+// `player` and `ai` are { style, weapon } choices.
+function newGame(player, ai, rng = Math.random) {
+  return { player: newFighter(player, rng), ai: newFighter(ai, rng), round: 1, log: [], over: false, winner: null };
 }
 
 // Damage a card inflicts on a Broken Blade user, who takes the hit unopposed.
-function hitValue(card) {
-  return card.id === 'crane' ? 0 : card.damage;
+function hitValue(card, dmg) {
+  return card.id === 'crane' ? 0 : dmg;
 }
 
 // Returns damage dealt to each side and a line for the log.
 // `a` and `b` are card ids; results are from a's point of view (a = player).
-function resolve(aId, bId) {
+function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
   const a = CARDS[aId];
   const b = CARDS[bId];
+  const da = cardDamage(aId, aWeapon);
+  const db = cardDamage(bId, bWeapon);
   const r = { toA: 0, toB: 0, text: '' };
 
   if (a.id === 'blade' || b.id === 'blade') {
     // Each side takes the other card's hit; a Blade also costs its user.
-    r.toA = hitValue(b) + (a.selfCost || 0);
-    r.toB = hitValue(a) + (b.selfCost || 0);
+    r.toA = hitValue(b, db) + (a.selfCost || 0);
+    r.toB = hitValue(a, da) + (b.selfCost || 0);
     r.text = 'A Broken Blade: blows land on both sides.';
     return r;
   }
@@ -78,14 +96,14 @@ function resolve(aId, bId) {
   }
 
   if (winner === 'trade') {
-    r.toA = b.damage;
-    r.toB = a.damage;
+    r.toA = db;
+    r.toB = da;
     r.text = 'Both strikes land.';
   } else if (winner === 'a') {
-    r.toB = Math.max(0, a.damage + (b.loseMod || 0));
+    r.toB = Math.max(0, da + (b.loseMod || 0));
     r.text = `${a.name} beats ${b.name}.`;
   } else if (winner === 'b') {
-    r.toA = Math.max(0, b.damage + (a.loseMod || 0));
+    r.toA = Math.max(0, db + (a.loseMod || 0));
     r.text = `${b.name} beats ${a.name}.`;
   } else {
     r.text = 'The forms cancel out.';
@@ -125,7 +143,7 @@ function playRound(state, playerIndex, aiIndex) {
   p.discard.push(pCard);
   ai.discard.push(aCard);
 
-  const r = resolve(pCard, aCard);
+  const r = resolve(pCard, aCard, p.weapon, ai.weapon);
   p.hp -= r.toA;
   ai.hp -= r.toB;
   state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.text} (You -${r.toA}, Enemy -${r.toB})`);
@@ -143,5 +161,5 @@ function playRound(state, playerIndex, aiIndex) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CARDS, STYLES, HAND_SIZE, START_HP, resolve, newGame, aiChoose, playRound };
+  module.exports = { CARDS, STYLES, WEAPONS, HAND_SIZE, START_HP, cardDamage, resolve, newGame, aiChoose, playRound };
 }
