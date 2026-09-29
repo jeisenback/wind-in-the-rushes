@@ -46,6 +46,19 @@ function cardDamage(cardId, weaponId = 'sword') {
   return Math.max(0, card.damage + (WEAPONS[weaponId].mods[card.family] || 0));
 }
 
+// Items: single use, committed face down with a card and revealed with it.
+// `keep` is roughly what an item is worth on an ordinary round; the AI only
+// spends one when using it now beats that.
+const ITEMS = {
+  gourd:       { name: 'Healing Gourd',  amount: 4, keep: 4,   text: 'Heal 4 HP.' },
+  tea:         { name: 'Calming Tea',    amount: 4, keep: 2,   text: 'Clear 4 posture before the clash.' },
+  smoke:       { name: 'Smoke Bomb',     keep: 2,   text: 'If you lose this round, take no damage or posture.' },
+  tonic:       { name: 'Battle Tonic',   amount: 3, keep: 2,   text: '+3 damage if your card wins.' },
+  knife:       { name: 'Throwing Knife', amount: 2, keep: 2,   text: 'Deal 2 damage no matter what.' },
+  firecracker: { name: 'Firecracker',    amount: 3, keep: 1.5, text: 'The enemy takes 3 posture no matter what.' },
+};
+const BELT_SIZE = 2;
+
 function shuffle(list, rng) {
   const a = list.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -56,14 +69,15 @@ function shuffle(list, rng) {
 }
 
 // Reserve cards (Broken Blade) stay out of the deck until the fighter is desperate.
-function newFighter({ style = 'balanced', weapon = 'sword' } = {}, rng) {
+// `belt` lists the fighter's items (at most BELT_SIZE, no repeats).
+function newFighter({ style = 'balanced', weapon = 'sword', belt = [] } = {}, rng) {
   const cards = STYLES[style].deck;
   const deck = shuffle(cards.filter((id) => !CARDS[id].reserve), rng);
   const reserve = cards.filter((id) => CARDS[id].reserve);
-  return { style, weapon, hp: START_HP, posture: 0, hand: deck.splice(0, HAND_SIZE), deck, reserve, discard: [], played: [] };
+  return { style, weapon, hp: START_HP, posture: 0, hand: deck.splice(0, HAND_SIZE), deck, reserve, discard: [], played: [], items: [...new Set(belt)].slice(0, BELT_SIZE) };
 }
 
-// `player` and `ai` are { style, weapon } choices.
+// `player` and `ai` are { style, weapon, belt } choices.
 function newGame(player, ai, rng = Math.random) {
   return { player: newFighter(player, rng), ai: newFighter(ai, rng), round: 1, log: [], last: null, clarity: { player: null, ai: null }, over: false, winner: null };
 }
@@ -104,6 +118,7 @@ function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
     r.partsB = [...onB.parts, ...(b.selfCost ? [`Broken Blade cost ${b.selfCost}`] : [])];
     r.rule = 'Broken Blade: no winner';
     r.text = 'A Broken Blade takes the enemy hit to land its own. Both sides are hurt.';
+    r.winner = 'blade';
     return r;
   }
 
@@ -161,7 +176,32 @@ function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
     const onA = hit(b, bWeapon, a);
     [r.toA, r.partsA, r.postureToA] = [onA.total, onA.parts, b.posture];
   }
+  r.winner = winner;
   return r;
+}
+
+// Applies each side's item (or null) to a clash result, returning a new result
+// with `healA`/`healB` and `clearA`/`clearB` (posture cleared) added.
+function applyItems(r, aItem, bItem) {
+  const out = { ...r, partsA: [...r.partsA], partsB: [...r.partsB], healA: 0, healB: 0, clearA: 0, clearB: 0 };
+  const sides = [['A', 'B', aItem, 'a', 'b'], ['B', 'A', bItem, 'b', 'a']];
+  // Smoke Bomb first, so it only cancels what the card clash did.
+  for (const [me, , item, self, other] of sides) {
+    if (item === 'smoke' && r.winner === other) {
+      out[`to${me}`] = 0;
+      out[`posture${'To' + me}`] = 0;
+      out[`parts${me}`] = ['Smoke Bomb: no damage'];
+    }
+  }
+  for (const [me, them, item, self] of sides) {
+    const n = item && ITEMS[item].amount;
+    if (item === 'tonic' && r.winner === self) { out[`to${them}`] += n; out[`parts${them}`].push(`Battle Tonic +${n}`); }
+    if (item === 'knife') { out[`to${them}`] += n; out[`parts${them}`].push(`Throwing Knife ${n}`); }
+    if (item === 'firecracker') out[`postureTo${them}`] += n;
+    if (item === 'gourd') out[`heal${me}`] = n;
+    if (item === 'tea') out[`clear${me}`] = n;
+  }
+  return out;
 }
 
 // Badly hurt: at half HP or less. Grants Clarity and brings in reserve cards.
@@ -214,40 +254,59 @@ function predictPlay(state) {
   return probs;
 }
 
-// How good one clash result is for the AI (side b of `r` is the player).
+// How good one clash result is for the AI (side a of `r` is the AI, b the player).
 // Counts HP, posture at half weight, guard breaks, and lethal blows.
 function outcomeValue(r, me, opp) {
-  let v = (r.toB - r.toA) + 0.5 * (r.postureToB - r.postureToA);
+  const myHp = Math.min(START_HP, me.hp - r.toA + (r.healA || 0));
+  const myPosture = Math.max(0, me.posture - (r.clearA || 0));
+  let v = (r.toB - (me.hp - myHp)) + 0.5 * (r.postureToB - r.postureToA + (me.posture - myPosture));
   if (opp.posture + r.postureToB >= POSTURE_MAX) v += DEATHBLOW;
-  if (me.posture + r.postureToA >= POSTURE_MAX) v -= DEATHBLOW;
+  if (myPosture + r.postureToA >= POSTURE_MAX) v -= DEATHBLOW;
   if (r.toB >= opp.hp) v += 20;
-  if (r.toA >= me.hp) v -= 20;
+  if (myHp <= 0) v -= 20;
   return v;
 }
 
-// AI: scores each card in hand by its expected value against the predicted
-// play, then picks among them with a softmax so it stays hard to read.
-// Lower `temperature` plays sharper and more predictably.
-function aiChoose(state, rng = Math.random, temperature = AI_TEMPERATURE) {
+// AI move: scores every card in hand, alone and with each item left in its
+// belt, by expected value against the predicted play. An item is charged its
+// `keep` value, so it is spent only when it beats saving it. Cards are then
+// picked with a softmax so the AI stays hard to read; lower `temperature`
+// plays sharper and more predictably. Returns { card, item }.
+function aiMove(state, rng = Math.random, temperature = AI_TEMPERATURE) {
   const me = state.ai;
   const opp = state.player;
   const probs = Object.entries(predictPlay(state));
-  const values = me.hand.map((id) => probs.reduce(
-    (sum, [theirs, p]) => sum + p * outcomeValue(resolve(id, theirs, me.weapon, opp.weapon), me, opp), 0));
-  const top = Math.max(...values);
-  const weights = values.map((v) => Math.exp((v - top) / temperature));
+  const options = me.hand.map((id) => {
+    let best = { item: null, value: -Infinity };
+    for (const item of [null, ...me.items]) {
+      const ev = probs.reduce((sum, [theirs, p]) => sum
+        + p * outcomeValue(applyItems(resolve(id, theirs, me.weapon, opp.weapon), item, null), me, opp), 0);
+      const value = ev - (item ? ITEMS[item].keep : 0);
+      // Using an item must beat keeping it by a real margin, not a rounding error.
+      if (value > best.value + 1e-6) best = { item, value };
+    }
+    return best;
+  });
+  const top = Math.max(...options.map((o) => o.value));
+  const weights = options.map((o) => Math.exp((o.value - top) / temperature));
   let roll = rng() * weights.reduce((a, b) => a + b, 0);
+  let card = weights.length - 1;
   for (let i = 0; i < weights.length; i++) {
     roll -= weights[i];
-    if (roll < 0) return i;
+    if (roll < 0) { card = i; break; }
   }
-  return weights.length - 1;
+  return { card, item: options[card].item };
 }
 
-// Adds posture damage, or recovers 1 if none was taken.
+function aiChoose(state, rng = Math.random, temperature = AI_TEMPERATURE) {
+  return aiMove(state, rng, temperature).card;
+}
+
+// Clears posture from an item, then adds posture damage, or recovers 1 if none was taken.
 // On a full bar the guard breaks: a deathblow lands and the bar resets.
 // Returns true if the guard broke.
-function applyPosture(f, taken) {
+function applyPosture(f, taken, cleared = 0) {
+  f.posture = Math.max(0, f.posture - cleared);
   if (taken > 0) f.posture += taken;
   else f.posture = Math.max(0, f.posture - 1);
   if (f.posture < POSTURE_MAX) return false;
@@ -272,8 +331,9 @@ function draw(f, n, rng) {
   return reshuffled;
 }
 
-// Plays one round. Mutates and returns state.
-function playRound(state, playerIndex, aiIndex, rng = Math.random) {
+// Plays one round. `items` is { player, ai }: an item id from that fighter's
+// belt to use this round, or null. Mutates and returns state.
+function playRound(state, playerIndex, aiIndex, rng = Math.random, items = {}) {
   const p = state.player;
   const ai = state.ai;
   const pCard = p.hand.splice(playerIndex, 1)[0];
@@ -283,11 +343,18 @@ function playRound(state, playerIndex, aiIndex, rng = Math.random) {
   p.played.push(pCard);
   ai.played.push(aCard);
 
-  const r = resolve(pCard, aCard, p.weapon, ai.weapon);
-  p.hp -= r.toA;
-  ai.hp -= r.toB;
-  const pBroke = applyPosture(p, r.postureToA);
-  const aBroke = applyPosture(ai, r.postureToB);
+  const used = {};
+  for (const [side, f] of [['player', p], ['ai', ai]]) {
+    const item = items[side] || null;
+    if (item && !f.items.includes(item)) throw new Error(`No ${item} left to use.`);
+    if (item) f.items.splice(f.items.indexOf(item), 1);
+    used[side] = item;
+  }
+  const r = applyItems(resolve(pCard, aCard, p.weapon, ai.weapon), used.player, used.ai);
+  p.hp = Math.min(START_HP, p.hp - r.toA + r.healA);
+  ai.hp = Math.min(START_HP, ai.hp - r.toB + r.healB);
+  const pBroke = applyPosture(p, r.postureToA, r.clearA);
+  const aBroke = applyPosture(ai, r.postureToB, r.clearB);
   const toPlayer = r.toA + (pBroke ? DEATHBLOW : 0);
   const toAi = r.toB + (aBroke ? DEATHBLOW : 0);
   state.last = {
@@ -295,9 +362,11 @@ function playRound(state, playerIndex, aiIndex, rng = Math.random) {
     partsPlayer: [...r.partsA, ...(pBroke ? [`Deathblow ${DEATHBLOW}`] : [])],
     partsAi: [...r.partsB, ...(aBroke ? [`Deathblow ${DEATHBLOW}`] : [])],
     toPlayer, toAi, postureToPlayer: r.postureToA, postureToAi: r.postureToB, pBroke, aBroke,
+    items: used, healPlayer: r.healA, healAi: r.healB, clearPlayer: r.clearA, clearAi: r.clearB,
   };
   const breaks = (pBroke ? ' Your guard breaks: deathblow!' : '') + (aBroke ? ' The enemy guard breaks: deathblow!' : '');
-  state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.rule}. ${r.text}${breaks} (You -${toPlayer}, Enemy -${toAi})`);
+  const withItem = (item) => (item ? ` with ${ITEMS[item].name}` : '');
+  state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}${withItem(used.player)}, the enemy plays ${CARDS[aCard].name}${withItem(used.ai)}. ${r.rule}. ${r.text}${breaks} (You -${toPlayer}, Enemy -${toAi})`);
 
   if (draw(p, HAND_SIZE - p.hand.length, rng)) state.log.push('Your discard pile is shuffled into a new deck.');
   if (draw(ai, HAND_SIZE - ai.hand.length, rng)) state.log.push('The enemy discard pile is shuffled into a new deck.');
@@ -316,5 +385,5 @@ function playRound(state, playerIndex, aiIndex, rng = Math.random) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CARDS, STYLES, WEAPONS, HAND_SIZE, START_HP, POSTURE_MAX, DEATHBLOW, cardDamage, resolve, newGame, predictPlay, aiChoose, playRound };
+  module.exports = { CARDS, STYLES, WEAPONS, ITEMS, BELT_SIZE, HAND_SIZE, START_HP, POSTURE_MAX, DEATHBLOW, cardDamage, resolve, applyItems, newGame, predictPlay, aiMove, aiChoose, playRound };
 }

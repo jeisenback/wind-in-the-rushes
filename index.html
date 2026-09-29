@@ -42,6 +42,12 @@
   /* Clarity: the enemy card you see, and your card the enemy sees. */
   .back.revealed { background: var(--panel); border: 2px solid var(--fam); }
   .clarity .meta { margin-top: 0; }
+  .items { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .items .meta { margin-top: 0; }
+  button.item { font: inherit; font-size: .85rem; padding: 4px 10px; border-radius: 8px; cursor: pointer; text-align: left;
+                border: 1px solid var(--posture); background: var(--panel); color: var(--ink); }
+  button.item.on { background: var(--posture); color: var(--panel); font-weight: 700; }
+  button.item:focus-visible { outline: 2px solid var(--posture); outline-offset: 2px; }
   .clarity { font-size: .85rem; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .card.seen::after { content: 'The enemy sees this card'; display: block; margin-top: 6px;
                       font-size: .7rem; font-weight: 700; color: var(--strike); }
@@ -80,7 +86,7 @@
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   @media (max-width: 600px) { .row { grid-template-columns: 1fr; } .card { width: calc(50% - 4px); } }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
-  #newGame, #style, #weapon { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);
+  #newGame, #style, #weapon, #item1, #item2 { max-width: 100%; font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);
              background: var(--panel); color: var(--ink); cursor: pointer; }
 </style>
 </head>
@@ -92,12 +98,16 @@
     Posture recovers 1 each round you take none.<br>
     At 10 HP or less you gain Clarity: each round one random enemy card is revealed, and Broken Blade joins your hand from reserve.
     The enemy gains the same when it is that low.<br>
-    When your deck runs out, your discard pile is shuffled into a new deck. The fight ends when someone reaches 0 HP.</p>
+    When your deck runs out, your discard pile is shuffled into a new deck. The fight ends when someone reaches 0 HP.<br>
+    You carry two single-use items. Pick one before playing a card to use it that round; both sides' items are revealed with the cards.</p>
   <div class="controls">
     <label for="style">Your style</label>
     <select id="style"></select>
     <label for="weapon">Weapon</label>
     <select id="weapon"></select>
+    <label for="item1">Items</label>
+    <select id="item1"></select>
+    <select id="item2" aria-label="Second item"></select>
     <button id="newGame">New game</button>
   </div>
 
@@ -123,6 +133,7 @@
   <div class="clash" id="clash"></div>
   <div id="banner"></div>
   <h2>Your hand</h2>
+  <div class="items" id="pItems"></div>
   <div class="hand" id="pHand"></div>
 
   <h2>Log</h2>
@@ -138,12 +149,24 @@
   $('style').innerHTML = styleIds.map((id) => `<option value="${id}">${STYLES[id].name}</option>`).join('');
   $('weapon').innerHTML = weaponIds.map((id) => `<option value="${id}">${weaponSummary(id)}</option>`).join('');
   const randomOf = (list) => list[Math.floor(Math.random() * list.length)];
+  const itemIds = Object.keys(ITEMS);
+  const itemOptions = itemIds.map((id) => `<option value="${id}">${ITEMS[id].name}: ${ITEMS[id].text}</option>`).join('');
+  $('item1').innerHTML = itemOptions;
+  $('item2').innerHTML = itemOptions;
+  $('item1').value = 'gourd';
+  $('item2').value = 'knife';
+  const randomBelt = () => {
+    const [a, b] = [...itemIds].sort(() => Math.random() - 0.5);
+    return [a, b];
+  };
+  let chosenItem = null; // the item the player will use with their next card
 
   function start() {
     state = newGame(
-      { style: $('style').value, weapon: $('weapon').value },
-      { style: randomOf(styleIds), weapon: randomOf(weaponIds) },
+      { style: $('style').value, weapon: $('weapon').value, belt: [$('item1').value, $('item2').value] },
+      { style: randomOf(styleIds), weapon: randomOf(weaponIds), belt: randomBelt() },
     );
+    chosenItem = null;
     render();
   }
 
@@ -191,14 +214,22 @@
     const pClass = last.toPlayer < last.toAi ? 'won' : last.toPlayer > last.toAi ? 'lost' : '';
     const aClass = last.toAi < last.toPlayer ? 'won' : last.toAi > last.toPlayer ? 'lost' : '';
     // What one side took, with the parts that add up to it. `from` is the card that hit them.
-    const hit = (n, parts, pos, from, broke) => `<div class="hit ${n ? 'hurt' : ''}">${n ? `-${n} HP` : 'No damage'}</div>`
+    // `own` is the item this side used, `theirs` the other side's.
+    const hit = (n, parts, pos, from, broke, own, theirs, heal, clear) =>
+      (own ? `<div class="why">used ${ITEMS[own].name}</div>` : '')
+      + `<div class="hit ${n ? 'hurt' : ''}">${n ? `-${n} HP` : 'No damage'}</div>`
       + (n ? `<div class="why">${parts.join(', ')}</div>` : '')
-      + (pos ? `<div class="hit">+${pos} posture</div><div class="why">from ${CARDS[from].name}</div>` : '')
+      + (heal ? `<div class="hit">+${heal} HP</div><div class="why">from Healing Gourd</div>` : '')
+      + (clear ? `<div class="hit">-${clear} posture</div><div class="why">from Calming Tea, before the clash</div>` : '')
+      + (pos ? `<div class="hit">+${pos} posture</div><div class="why">from ${postureSource(from, pos, theirs)}</div>` : '')
       + (broke ? `<div class="hit hurt">Guard broken: deathblow -${DEATHBLOW}</div>` : '');
+    // Firecracker adds posture on top of (or instead of) the card's.
+    const postureSource = (card, pos, item) => (item !== 'firecracker' ? CARDS[card].name
+      : pos > ITEMS.firecracker.amount ? `${CARDS[card].name} and Firecracker ${ITEMS.firecracker.amount}` : 'Firecracker');
     el.innerHTML = `
-      <div class="slot you"><div class="who">You</div>${cardFace(last.player, state.player.weapon, 'div', '', pClass)}${hit(last.toPlayer, last.partsPlayer, last.postureToPlayer, last.ai, last.pBroke)}</div>
+      <div class="slot you"><div class="who">You</div>${cardFace(last.player, state.player.weapon, 'div', '', pClass)}${hit(last.toPlayer, last.partsPlayer, last.postureToPlayer, last.ai, last.pBroke, last.items.player, last.items.ai, last.healPlayer, last.clearPlayer)}</div>
       <div class="mid"><div class="vs">ROUND ${last.round}</div><div class="rule">${last.rule}</div><div class="result">${last.text}</div></div>
-      <div class="slot enemy"><div class="who">Enemy</div>${cardFace(last.ai, state.ai.weapon, 'div', '', aClass)}${hit(last.toAi, last.partsAi, last.postureToAi, last.player, last.aBroke)}</div>`;
+      <div class="slot enemy"><div class="who">Enemy</div>${cardFace(last.ai, state.ai.weapon, 'div', '', aClass)}${hit(last.toAi, last.partsAi, last.postureToAi, last.player, last.aBroke, last.items.ai, last.items.player, last.healAi, last.clearAi)}</div>`;
     el.classList.remove('fresh');
     void el.offsetWidth; // restart the deal animation
     el.classList.add('fresh');
@@ -217,7 +248,11 @@
     }
     const reserve = (f) => (f.reserve.length ? ' | Broken Blade in reserve' : '');
     $('pMeta').textContent = `${styleSummary(p.style)} | ${weaponSummary(p.weapon)} | Deck: ${p.deck.length}${reserve(p)}`;
-    $('aMeta').textContent = `${styleSummary(ai.style)} | ${weaponSummary(ai.weapon)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}${reserve(ai)}`;
+    $('aMeta').textContent = `${styleSummary(ai.style)} | ${weaponSummary(ai.weapon)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}${reserve(ai)}`
+      + ` | Items left: ${ai.items.length ? ai.items.map((id) => ITEMS[id].name).join(', ') : 'none'}`;
+    $('pItems').innerHTML = p.items.length && !state.over
+      ? '<span class="meta">Use an item with your next card:</span>' + p.items.map((id) => `<button class="item${id === chosenItem ? ' on' : ''}" data-item="${id}" aria-pressed="${id === chosenItem}" ><strong>${ITEMS[id].name}:</strong> ${ITEMS[id].text}</button>`).join('')
+      : `<span class="meta">${p.items.length ? '' : 'No items left.'}</span>`;
     const seen = state.over ? null : state.clarity.player;
     $('aHand').innerHTML = ai.hand
       .map((id, i) => (i === seen ? `<div class="back revealed ${CARDS[id].family}"></div>` : '<div class="back"></div>'))
@@ -248,13 +283,30 @@
   $('pHand').addEventListener('click', (e) => {
     const btn = e.target.closest('button.card');
     if (!btn || state.over) return;
-    playRound(state, Number(btn.dataset.i), aiChoose(state));
+    const enemy = aiMove(state);
+    playRound(state, Number(btn.dataset.i), enemy.card, Math.random, { player: chosenItem, ai: enemy.item });
+    chosenItem = null;
+    render();
+  });
+  $('pItems').addEventListener('click', (e) => {
+    const btn = e.target.closest('button.item');
+    if (!btn) return;
+    chosenItem = chosenItem === btn.dataset.item ? null : btn.dataset.item;
     render();
   });
   $('newGame').addEventListener('click', start);
   // A new loadout only makes sense from round 1, so changing either one restarts.
   $('style').addEventListener('change', start);
   $('weapon').addEventListener('change', start);
+  // Items must differ: picking the other slot's item swaps the two.
+  for (const [me, other] of [['item1', 'item2'], ['item2', 'item1']]) {
+    let previous = $(me).value;
+    $(me).addEventListener('change', () => {
+      if ($(me).value === $(other).value) $(other).value = previous;
+      previous = $(me).value;
+      start();
+    });
+  }
   start();
 </script>
 </body>

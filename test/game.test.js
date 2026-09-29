@@ -180,3 +180,49 @@ test('an empty deck is rebuilt from the discard pile', () => {
   assert.equal(s.player.hand.length + s.player.deck.length + s.player.discard.length, cards);
   assert.ok(s.log.includes('Your discard pile is shuffled into a new deck.'));
 });
+
+// Round result for player card a against enemy card b with items used.
+const withItems = (a, b, aItem, bItem) => require('../game.js').applyItems(resolve(a, b), aItem, bItem);
+
+test('item effects', () => {
+  const tonic = withItems('sparrow', 'willow', 'tonic', null);
+  assert.equal(tonic.toB, 7);
+  assert.ok(tonic.partsB.includes('Battle Tonic +3'));
+  assert.equal(withItems('willow', 'sparrow', 'tonic', null).toB, 0); // lost: Tonic wasted
+  assert.equal(withItems('willow', 'sparrow', 'knife', null).toB, 2); // Knife lands anyway
+  assert.equal(withItems('gate', 'gate', 'firecracker', null).postureToB, 3);
+  const smoke = withItems('willow', 'sparrow', 'smoke', null);
+  assert.deepEqual([smoke.toA, smoke.postureToA], [0, 0]);
+  assert.equal(withItems('hawk', 'hawk', 'smoke', null).toA, 4); // a trade is not a loss
+  assert.equal(withItems('gate', 'gate', 'gourd', null).healA, 4);
+  assert.equal(withItems('gate', 'gate', 'tea', null).clearA, 4);
+});
+
+test('items are used once, heal is capped, and tea clears before the clash', () => {
+  const { newGame: ng } = require('../game.js');
+  const s = ng({ belt: ['gourd', 'tea'] }, {});
+  s.player.hand[0] = 'gate';
+  s.ai.hand[0] = 'sparrow';
+  s.player.hp = 19;
+  playRound(s, 0, 0, Math.random, { player: 'gourd' }); // takes 3, heals 4, capped at 20
+  assert.equal(s.player.hp, 20);
+  assert.deepEqual(s.player.items, ['tea']);
+  assert.throws(() => playRound(s, 0, 0, Math.random, { player: 'gourd' }));
+  s.player.hand[0] = 'gate';
+  s.ai.hand[0] = 'sparrow';
+  s.player.posture = 7;
+  playRound(s, 0, 0, Math.random, { player: 'tea' }); // 7 - 4 + 2 = 5, no break
+  assert.equal(s.player.posture, 5);
+  assert.equal(s.last.pBroke, false);
+});
+
+test('the AI saves items it does not need, and uses a Knife to finish', () => {
+  const { aiMove } = require('../game.js');
+  const s = newGame({}, { belt: ['knife'] });
+  s.ai.hand = ['gate', 'gate', 'gate', 'gate'];
+  const early = aiMove(s, Math.random, 0.01);
+  assert.equal(early.item, null);
+  s.player.hp = 2;
+  const finish = aiMove(s, Math.random, 0.01);
+  assert.equal(finish.item, 'knife');
+});

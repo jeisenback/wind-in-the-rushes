@@ -6,8 +6,9 @@ Play: open `index.html` in a browser. Tests: `node --test`.
 
 ## Round
 
-1. Each fighter has a 12-card deck and a hand of 4. Both start at 20 HP.
-2. Both play one card face down, then reveal.
+1. Each fighter has an 11-card deck (plus Broken Blade in reserve), a hand of 4,
+   and a belt of 2 single-use items. Both start at 20 HP.
+2. Both play one card face down, optionally with one item, then reveal.
 3. The winner deals their card's damage.
 4. Both draw back up to 4.
 5. When a deck runs out, that fighter's discard pile is shuffled into a new deck.
@@ -61,21 +62,35 @@ In simulation, +1 or +2 damage when desperate lifted comebacks only to 13-15%,
 while making a lead feel fragile. Stopping posture recovery at low HP had no
 measurable effect, so that rule was dropped.
 
-## Simulation (1,000 AI-vs-AI games, random loadouts)
+## Items
 
-With Broken Blade locked, Clarity in, and Sparrow Turns at 4 damage: games
-run about 8.8 rounds, 88% have at least one guard break, and 20% end on a
-deathblow. The fighter who drops to half HP first comes back to win about 18%
-of the time (10% without Clarity). Broken Blade decides 7% of rounds.
+Each fighter carries a belt of 2 different items, chosen with style and weapon
+(random for the AI). Each is used once. You commit an item face down with your
+card and both are revealed together, so an item is part of your read, not a
+reaction to it. Belts and used items are public.
 
-Regular cards sit between -0.45 (Quick Needle) and +0.26 (Willow Bends) HP
-per play. Sparrow Turns moved from -0.53 to -0.18 when its damage went from
-3 to 4. Loadouts range from about 41% (Storm + Staff, Stone + Sword) to 63%
-(Stone + Staff).
+| Item | Effect |
+|---|---|
+| Healing Gourd | Heal 4 HP |
+| Calming Tea | Clear 4 posture before the clash |
+| Smoke Bomb | If you lose this round, take no damage or posture |
+| Battle Tonic | +3 damage if your card wins |
+| Throwing Knife | Deal 2 damage no matter what |
+| Firecracker | The enemy takes 3 posture no matter what |
+
+The AI scores every card with and without each remaining item. Each item has a
+`keep` value (roughly what it is worth on an ordinary round), and the AI only
+spends it when using it now beats that by a real margin, so it saves the Knife
+for a finishing blow and the Gourd for danger.
+
+Tuning (3,000 AI-vs-AI games per variant, random belts): with the first values,
+fighters carrying Battle Tonic (+2) won 44% and Healing Gourd (heal 5) 56%.
+Tonic +3 and Gourd 4 brought every item between 47% and 54%. Items shorten
+games slightly (about 8.8 rounds) and leave style balance intact (47-52%).
 
 ## Fighting styles
 
-A style is a 12-card deck list. You pick yours; the AI picks at random. Both
+A style is a 12-card list (11-card deck plus Broken Blade). You pick yours; the AI picks at random. Both
 styles are shown, so you know the enemy's card mix.
 
 | Style | Hawk | Needle | Gate | Willow | Mist | Sparrow | Crane | Blade |
@@ -85,9 +100,8 @@ styles are shown, so you know the enemy's card mix.
 | Stone (Guard-heavy) | 1 | 1 | 3 | 2 | 1 | 2 | 1 | 1 |
 | Stream (Flow-heavy) | 1 | 1 | 1 | 1 | 3 | 3 | 1 | 1 |
 
-The styles form their own triangle: Stone beats Storm, Storm beats Stream,
-Stream beats Stone (random play). With posture, every style sits between 48%
-and 53% overall.
+With random play the styles formed their own triangle (Stone beats Storm,
+Storm beats Stream, Stream beats Stone). Current style numbers are under AI.
 
 ## Weapons
 
@@ -102,8 +116,7 @@ cards are never modified. You pick yours; the AI picks at random.
 | Twin Knives | 0 | -1 | +1 |
 
 Each weapon averages about 50% across all loadouts. Matching a weapon to your
-style pays off and mismatching costs; with posture, loadouts range from about
-43% to 57%.
+style pays off and mismatching costs.
 
 ## Balance
 
