@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wind in the Rushes</title>
+<style>
+  :root {
+    --bg: #f4f1ea; --panel: #fffdf8; --ink: #222; --muted: #6b665c; --line: #d8d2c4;
+    --strike: #b8412f; --guard: #2f5fb8; --flow: #2f8a5a; --special: #7a4fb0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1916; --panel: #24221e; --ink: #ece8df; --muted: #a39d90; --line: #3a372f;
+      --strike: #e0705d; --guard: #6f9be8; --flow: #5dbf8a; --special: #b28ae0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 0 0 12px; }
+  h2 { font-size: 1rem; margin: 16px 0 8px; color: var(--muted); font-weight: 600; }
+  .side { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .hp { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .bar { flex: 1; height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--strike); transition: width .3s; }
+  .meta { color: var(--muted); font-size: .85rem; margin-top: 6px; }
+  .hand { display: flex; flex-wrap: wrap; gap: 8px; }
+  .card { width: 150px; min-height: 120px; text-align: left; padding: 10px; border-radius: 8px;
+          border: 2px solid var(--fam); background: var(--panel); color: var(--ink); font: inherit; }
+  button.card { cursor: pointer; }
+  button.card:hover:not(:disabled) { transform: translateY(-2px); }
+  button.card:disabled { opacity: .5; cursor: default; }
+  .card .fam { color: var(--fam); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+  .card .name { font-weight: 700; margin: 2px 0; }
+  .card .text { font-size: .8rem; color: var(--muted); }
+  .back { width: 40px; height: 56px; border-radius: 6px; background: var(--line); }
+  .strike { --fam: var(--strike); } .guard { --fam: var(--guard); }
+  .flow { --fam: var(--flow); } .special { --fam: var(--special); }
+  .pile { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: .75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--fam); color: var(--fam); }
+  #banner { font-size: 1.1rem; font-weight: 700; margin: 12px 0; min-height: 1.4em; }
+  #log { list-style: none; padding: 0; font-size: .85rem; color: var(--muted); max-height: 220px; overflow-y: auto; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  @media (max-width: 600px) { .row { grid-template-columns: 1fr; } .card { width: calc(50% - 4px); } }
+  #newGame { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);
+             background: var(--panel); color: var(--ink); cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Wind in the Rushes</h1>
+  <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.</p>
+
+  <div class="row">
+    <div class="side">
+      <div class="hp">You <div class="bar"><div id="pBar"></div></div> <span id="pHp"></span></div>
+      <div class="meta" id="pMeta"></div>
+      <h2>Your discards</h2>
+      <div class="pile" id="pPile"></div>
+    </div>
+    <div class="side">
+      <div class="hp">Enemy <div class="bar"><div id="aBar"></div></div> <span id="aHp"></span></div>
+      <div class="meta" id="aMeta"></div>
+      <div class="hand" id="aHand" style="margin-top:8px"></div>
+      <h2>Enemy discards</h2>
+      <div class="pile" id="aPile"></div>
+    </div>
+  </div>
+
+  <div id="banner"></div>
+  <h2>Your hand</h2>
+  <div class="hand" id="pHand"></div>
+
+  <h2>Log</h2>
+  <ul id="log"></ul>
+  <button id="newGame">New game</button>
+</main>
+
+<script src="game.js"></script>
+<script>
+  let state = newGame();
+  const $ = (id) => document.getElementById(id);
+
+  function chip(id) {
+    const c = CARDS[id];
+    return `<span class="chip ${c.family}">${c.name}</span>`;
+  }
+
+  function render() {
+    const { player: p, ai } = state;
+    $('pHp').textContent = `${Math.max(0, p.hp)} / ${START_HP}`;
+    $('aHp').textContent = `${Math.max(0, ai.hp)} / ${START_HP}`;
+    $('pBar').style.width = `${Math.max(0, p.hp) / START_HP * 100}%`;
+    $('aBar').style.width = `${Math.max(0, ai.hp) / START_HP * 100}%`;
+    $('pMeta').textContent = `Deck: ${p.deck.length}`;
+    $('aMeta').textContent = `Deck: ${ai.deck.length} | Hand: ${ai.hand.length}`;
+    $('aHand').innerHTML = ai.hand.map(() => '<div class="back"></div>').join('');
+    $('pPile').innerHTML = p.discard.map(chip).join('');
+    $('aPile').innerHTML = ai.discard.map(chip).join('');
+    $('pHand').innerHTML = p.hand.map((id, i) => {
+      const c = CARDS[id];
+      return `<button class="card ${c.family}" data-i="${i}" ${state.over ? 'disabled' : ''}>
+        <div class="fam">${c.family} | ${c.damage} dmg</div>
+        <div class="name">${c.name}</div>
+        <div class="text">${c.text}</div>
+      </button>`;
+    }).join('');
+    $('log').innerHTML = state.log.slice().reverse().map((l) => `<li>${l}</li>`).join('');
+    $('banner').textContent = state.over
+      ? { player: 'Victory.', ai: 'Defeat.', draw: 'A draw.' }[state.winner]
+      : `Round ${state.round}: choose a form.`;
+  }
+
+  $('pHand').addEventListener('click', (e) => {
+    const btn = e.target.closest('button.card');
+    if (!btn || state.over) return;
+    playRound(state, Number(btn.dataset.i), aiChoose(state));
+    render();
+  });
+  $('newGame').addEventListener('click', () => { state = newGame(); render(); });
+  render();
+</script>
+</body>
+</html>
