@@ -8,14 +8,14 @@ const BLADE_DAMAGE = 8;
 const BEATS = { strike: 'flow', flow: 'guard', guard: 'strike' };
 
 const CARDS = {
-  hawk:   { id: 'hawk',   name: 'Falling Hawk',         family: 'strike',  damage: 4, text: 'Take 1 extra damage if this loses.' },
-  needle: { id: 'needle', name: 'Quick Needle',         family: 'strike',  damage: 2, text: 'Wins Strike ties instead of trading.' },
-  gate:   { id: 'gate',   name: 'Iron Gate',            family: 'guard',   damage: 1, text: 'A solid block.' },
+  hawk:   { id: 'hawk',   name: 'Falling Hawk',         family: 'strike',  damage: 4, text: 'A heavy blow.' },
+  needle: { id: 'needle', name: 'Quick Needle',         family: 'strike',  damage: 2, winsTies: true, text: 'Wins Strike ties instead of trading.' },
+  gate:   { id: 'gate',   name: 'Iron Gate',            family: 'guard',   damage: 2, loseMod: -1, text: 'Take 1 less damage if this loses.' },
   willow: { id: 'willow', name: 'Willow Bends',         family: 'guard',   damage: 3, text: 'Counterattack. Nothing on a tie.' },
-  mist:   { id: 'mist',   name: 'Mist on the Pond',     family: 'flow',    damage: 2, text: 'Draw 1 extra card if this wins.' },
+  mist:   { id: 'mist',   name: 'Mist on the Pond',     family: 'flow',    damage: 2, winsTies: true, text: 'Wins Flow ties.' },
   sparrow:{ id: 'sparrow',name: 'Sparrow Turns',        family: 'flow',    damage: 3, text: 'A reliable feint.' },
   crane:  { id: 'crane',  name: 'Crane in Still Water', family: 'special', damage: 7, text: 'Beats any Strike. Loses to everything else.' },
-  blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, text: 'Take the enemy hit, then deal 8.' },
+  blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, selfCost: 4, text: 'Take the enemy hit plus 4, then deal 8.' },
 };
 
 const STARTER_DECK = [
@@ -48,17 +48,17 @@ function hitValue(card) {
   return card.id === 'crane' ? 0 : card.damage;
 }
 
-// Returns damage dealt to each side, extra draws, and a line for the log.
+// Returns damage dealt to each side and a line for the log.
 // `a` and `b` are card ids; results are from a's point of view (a = player).
 function resolve(aId, bId) {
   const a = CARDS[aId];
   const b = CARDS[bId];
-  const r = { toA: 0, toB: 0, drawA: 0, drawB: 0, text: '' };
+  const r = { toA: 0, toB: 0, text: '' };
 
   if (a.id === 'blade' || b.id === 'blade') {
-    // Each side takes the other card's hit; a Blade's hit is always 8.
-    r.toA = hitValue(b);
-    r.toB = hitValue(a);
+    // Each side takes the other card's hit; a Blade also costs its user.
+    r.toA = hitValue(b) + (a.selfCost || 0);
+    r.toB = hitValue(a) + (b.selfCost || 0);
     r.text = 'A Broken Blade: blows land on both sides.';
     return r;
   }
@@ -69,11 +69,9 @@ function resolve(aId, bId) {
     else if (a.id === 'crane') winner = b.family === 'strike' ? 'a' : 'b';
     else winner = a.family === 'strike' ? 'b' : 'a';
   } else if (a.family === b.family) {
-    if (a.family === 'strike') {
-      if (a.id === 'needle' && b.id !== 'needle') winner = 'a';
-      else if (b.id === 'needle' && a.id !== 'needle') winner = 'b';
-      else winner = 'trade';
-    }
+    if (a.winsTies && !b.winsTies) winner = 'a';
+    else if (b.winsTies && !a.winsTies) winner = 'b';
+    else if (a.family === 'strike') winner = 'trade';
   } else {
     winner = BEATS[a.family] === b.family ? 'a' : 'b';
   }
@@ -83,12 +81,10 @@ function resolve(aId, bId) {
     r.toB = a.damage;
     r.text = 'Both strikes land.';
   } else if (winner === 'a') {
-    r.toB = a.damage + (b.id === 'hawk' ? 1 : 0);
-    if (a.id === 'mist') r.drawA = 1;
+    r.toB = Math.max(0, a.damage + (b.loseMod || 0));
     r.text = `${a.name} beats ${b.name}.`;
   } else if (winner === 'b') {
-    r.toA = b.damage + (a.id === 'hawk' ? 1 : 0);
-    if (b.id === 'mist') r.drawB = 1;
+    r.toA = Math.max(0, b.damage + (a.loseMod || 0));
     r.text = `${b.name} beats ${a.name}.`;
   } else {
     r.text = 'The forms cancel out.';
@@ -133,8 +129,8 @@ function playRound(state, playerIndex, aiIndex) {
   ai.hp -= r.toB;
   state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.text} (You -${r.toA}, Enemy -${r.toB})`);
 
-  draw(p, Math.max(0, HAND_SIZE - p.hand.length) + r.drawA);
-  draw(ai, Math.max(0, HAND_SIZE - ai.hand.length) + r.drawB);
+  draw(p, HAND_SIZE - p.hand.length);
+  draw(ai, HAND_SIZE - ai.hand.length);
   state.round++;
 
   const dead = p.hp <= 0 || ai.hp <= 0;

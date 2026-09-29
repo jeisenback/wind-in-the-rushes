@@ -2,40 +2,38 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { resolve, newGame, playRound, aiChoose } = require('../game.js');
 
+const dmg = (a, b) => { const r = resolve(a, b); return [r.toA, r.toB]; };
+
 test('family triangle', () => {
-  assert.deepEqual([resolve('sparrow', 'gate').toB, resolve('sparrow', 'gate').toA], [3, 0]);
-  assert.equal(resolve('gate', 'needle').toB, 1);
-  assert.equal(resolve('needle', 'sparrow').toB, 2);
+  assert.deepEqual(dmg('sparrow', 'willow'), [0, 3]);
+  assert.deepEqual(dmg('willow', 'hawk'), [0, 3]);
+  assert.deepEqual(dmg('hawk', 'sparrow'), [0, 4]);
+});
+
+test('iron gate softens a loss', () => {
+  assert.deepEqual(dmg('sparrow', 'gate'), [0, 2]);
+  assert.deepEqual(dmg('gate', 'needle'), [0, 2]);
 });
 
 test('ties', () => {
-  const trade = resolve('hawk', 'hawk');
-  assert.deepEqual([trade.toA, trade.toB], [4, 4]);
-  const needle = resolve('needle', 'hawk');
-  assert.deepEqual([needle.toA, needle.toB], [0, 3]); // needle wins, hawk takes +1
-  const guards = resolve('willow', 'gate');
-  assert.deepEqual([guards.toA, guards.toB], [0, 0]);
-});
-
-test('mist draws on win', () => {
-  assert.equal(resolve('mist', 'gate').drawA, 1);
-  assert.equal(resolve('mist', 'hawk').drawA, 0);
+  assert.deepEqual(dmg('hawk', 'hawk'), [4, 4]);
+  assert.deepEqual(dmg('needle', 'hawk'), [0, 2]);
+  assert.deepEqual(dmg('needle', 'needle'), [2, 2]);
+  assert.deepEqual(dmg('mist', 'sparrow'), [0, 2]);
+  assert.deepEqual(dmg('willow', 'gate'), [0, 0]);
 });
 
 test('crane', () => {
-  assert.equal(resolve('crane', 'hawk').toB, 8);
-  assert.equal(resolve('crane', 'needle').toB, 7);
-  assert.equal(resolve('crane', 'willow').toA, 3);
-  assert.equal(resolve('sparrow', 'crane').toB, 3);
+  assert.deepEqual(dmg('crane', 'hawk'), [0, 7]);
+  assert.deepEqual(dmg('crane', 'willow'), [3, 0]);
+  assert.deepEqual(dmg('sparrow', 'crane'), [0, 3]);
+  assert.deepEqual(dmg('crane', 'crane'), [0, 0]);
 });
 
-test('broken blade', () => {
-  const r = resolve('blade', 'hawk');
-  assert.deepEqual([r.toA, r.toB], [4, 8]);
-  const c = resolve('crane', 'blade');
-  assert.deepEqual([c.toA, c.toB], [8, 0]);
-  const bb = resolve('blade', 'blade');
-  assert.deepEqual([bb.toA, bb.toB], [8, 8]);
+test('broken blade costs its user', () => {
+  assert.deepEqual(dmg('blade', 'hawk'), [8, 8]);
+  assert.deepEqual(dmg('crane', 'blade'), [8, 4]);
+  assert.deepEqual(dmg('blade', 'blade'), [12, 12]);
 });
 
 test('full games end with a winner', () => {

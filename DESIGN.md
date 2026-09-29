@@ -26,16 +26,23 @@ Ties: Strike vs Strike trades (both deal damage). Guard vs Guard and Flow vs Flo
 
 | Card | Family | Dmg | Effect |
 |---|---|---|---|
-| Falling Hawk | Strike | 4 | Take 1 extra damage if this loses |
+| Falling Hawk | Strike | 4 | A heavy blow |
 | Quick Needle | Strike | 2 | Wins Strike ties instead of trading |
-| Iron Gate | Guard | 1 | A solid block |
+| Iron Gate | Guard | 2 | Take 1 less damage if this loses |
 | Willow Bends | Guard | 3 | Counterattack. Nothing on a tie |
-| Mist on the Pond | Flow | 2 | Draw 1 extra card if this wins |
+| Mist on the Pond | Flow | 2 | Wins Flow ties |
 | Sparrow Turns | Flow | 3 | A reliable feint |
 | Crane in Still Water | Special | 7 | Beats any Strike. Loses to everything else |
-| Broken Blade | Special | 8 | Take the enemy hit, then deal 8 |
+| Broken Blade | Special | 8 | Take the enemy hit plus 4, then deal 8 |
 
 Starter deck: Hawk x2, Needle x2, Gate x2, Willow, Mist x2, Sparrow, Crane, Blade.
+
+## Balance
+
+Average net damage of each card against a random card from the starter deck
+(first pass, from simulation): regular cards all sit between -0.6 and +0.6,
+Crane about +0.8, Broken Blade about +1.5. Games run about 8 rounds and
+almost always end on HP, not on empty hands.
 
 ## AI (v1)
 
