@@ -8,13 +8,13 @@ const firstPlayable = (f) => f.hand.findIndex((_, i) => canPlay(f, i));
 const dmg = (a, b) => { const r = resolve(a, b); return [r.toA, r.toB]; };
 
 test('family triangle', () => {
-  assert.deepEqual(dmg('sparrow', 'willow'), [0, 3]);
+  assert.deepEqual(dmg('sparrow', 'willow'), [0, 4]);
   assert.deepEqual(dmg('willow', 'hawk'), [0, 3]);
   assert.deepEqual(dmg('hawk', 'sparrow'), [0, 4]);
 });
 
 test('iron gate softens a loss', () => {
-  assert.deepEqual(dmg('sparrow', 'gate'), [0, 2]);
+  assert.deepEqual(dmg('sparrow', 'gate'), [0, 3]);
   assert.deepEqual(dmg('gate', 'needle'), [0, 2]);
 });
 
@@ -29,7 +29,7 @@ test('ties', () => {
 test('crane', () => {
   assert.deepEqual(dmg('crane', 'hawk'), [0, 7]);
   assert.deepEqual(dmg('crane', 'willow'), [3, 0]);
-  assert.deepEqual(dmg('sparrow', 'crane'), [0, 3]);
+  assert.deepEqual(dmg('sparrow', 'crane'), [0, 4]);
   assert.deepEqual(dmg('crane', 'crane'), [0, 0]);
 });
 
@@ -59,13 +59,13 @@ test('every style has a 12-card deck of known cards', () => {
 test('weapons modify family damage but not specials', () => {
   const { cardDamage } = require('../game.js');
   assert.equal(cardDamage('hawk', 'greatblade'), 5);
-  assert.equal(cardDamage('sparrow', 'greatblade'), 2);
+  assert.equal(cardDamage('sparrow', 'greatblade'), 3);
   assert.equal(cardDamage('willow', 'staff'), 5);
   assert.equal(cardDamage('crane', 'staff'), 7);
   const r = resolve('hawk', 'hawk', 'greatblade', 'staff');
   assert.deepEqual([r.toA, r.toB], [3, 5]);
   const g = resolve('sparrow', 'gate', 'knives', 'sword');
-  assert.deepEqual([g.toA, g.toB], [0, 3]); // 3 + 1 knives - 1 gate
+  assert.deepEqual([g.toA, g.toB], [0, 4]); // 4 + 1 knives - 1 gate
 });
 
 test('posture damage goes to the loser, both on a trade, none from a Blade', () => {
@@ -111,7 +111,7 @@ test('posture recovers 1 when untouched, at any HP', () => {
 test('results name the deciding rule and the damage parts', () => {
   const f = resolve('sparrow', 'gate', 'knives');
   assert.equal(f.rule, 'Flow beats Guard');
-  assert.deepEqual(f.partsB, ['Sparrow Turns 3', 'Twin Knives +1', 'Iron Gate -1']);
+  assert.deepEqual(f.partsB, ['Sparrow Turns 4', 'Twin Knives +1', 'Iron Gate -1']);
   assert.equal(resolve('crane', 'hawk').rule, 'Crane beats any Strike');
   assert.equal(resolve('gate', 'crane').rule, 'Crane loses to anything but a Strike');
   assert.equal(resolve('needle', 'hawk').rule, 'Strike tie: Quick Needle wins ties');

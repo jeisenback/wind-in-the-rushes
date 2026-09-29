@@ -16,7 +16,7 @@ const CARDS = {
   gate:   { id: 'gate',   name: 'Iron Gate',            family: 'guard',   damage: 2, posture: 2, loseMod: -1, text: 'Take 1 less damage if this loses.' },
   willow: { id: 'willow', name: 'Willow Bends',         family: 'guard',   damage: 3, posture: 3, text: 'A deflect and counter.' },
   mist:   { id: 'mist',   name: 'Mist on the Pond',     family: 'flow',    damage: 2, posture: 2, winsTies: true, text: 'Wins Flow ties.' },
-  sparrow:{ id: 'sparrow',name: 'Sparrow Turns',        family: 'flow',    damage: 3, posture: 2, text: 'A reliable feint.' },
+  sparrow:{ id: 'sparrow',name: 'Sparrow Turns',        family: 'flow',    damage: 4, posture: 2, text: 'A feint that cuts deep.' },
   crane:  { id: 'crane',  name: 'Crane in Still Water', family: 'special', damage: 7, posture: 5, text: 'Beats any Strike, crushing posture. Loses to everything else.' },
   blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, posture: 0, selfCost: 4, desperate: true, text: 'Only at 10 HP or less. Take the enemy hit plus 4, then deal 8.' },
 };

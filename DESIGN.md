@@ -31,7 +31,7 @@ Ties: Strike vs Strike trades (both deal damage). Guard vs Guard and Flow vs Flo
 | Iron Gate | Guard | 2 | 2 | Take 1 less damage if this loses |
 | Willow Bends | Guard | 3 | 3 | A deflect and counter |
 | Mist on the Pond | Flow | 2 | 2 | Wins Flow ties |
-| Sparrow Turns | Flow | 3 | 2 | A reliable feint |
+| Sparrow Turns | Flow | 4 | 2 | A feint that cuts deep |
 | Crane in Still Water | Special | 7 | 5 | Beats any Strike, crushing posture. Loses to everything else |
 | Broken Blade | Special | 8 | 0 | Only at 10 HP or less. Take the enemy hit plus 4, then deal 8 |
 
@@ -62,12 +62,15 @@ measurable effect, so that rule was dropped.
 
 ## Simulation (1,000 AI-vs-AI games, random loadouts)
 
-With Broken Blade locked and Clarity in: games run about 9 rounds, 90% have
-at least one guard break, and 17% end on a deathblow. The fighter who drops to
-half HP first comes back to win 17% of the time (10% without Clarity). Broken
-Blade decides 7% of rounds. Sparrow Turns is still the weakest card (about
--0.5 HP per play). Loadouts range from about 37% (Stream + Greatblade,
-Storm + Staff) to 62% (Stone + Staff).
+With Broken Blade locked, Clarity in, and Sparrow Turns at 4 damage: games
+run about 8.8 rounds, 88% have at least one guard break, and 20% end on a
+deathblow. The fighter who drops to half HP first comes back to win about 18%
+of the time (10% without Clarity). Broken Blade decides 7% of rounds.
+
+Regular cards sit between -0.45 (Quick Needle) and +0.26 (Willow Bends) HP
+per play. Sparrow Turns moved from -0.53 to -0.18 when its damage went from
+3 to 4. Loadouts range from about 41% (Storm + Staff, Stone + Sword) to 63%
+(Stone + Staff).
 
 ## Fighting styles
 
