@@ -104,3 +104,15 @@ test('posture recovers only when untouched, and not below half HP', () => {
   playRound(low, 0, 0);
   assert.equal(low.player.posture, 3);
 });
+
+test('results name the deciding rule and the damage parts', () => {
+  const f = resolve('sparrow', 'gate', 'knives');
+  assert.equal(f.rule, 'Flow beats Guard');
+  assert.deepEqual(f.partsB, ['Sparrow Turns 3', 'Twin Knives +1', 'Iron Gate -1']);
+  assert.equal(resolve('crane', 'hawk').rule, 'Crane beats any Strike');
+  assert.equal(resolve('gate', 'crane').rule, 'Crane loses to anything but a Strike');
+  assert.equal(resolve('needle', 'hawk').rule, 'Strike tie: Quick Needle wins ties');
+  assert.equal(resolve('hawk', 'hawk').rule, 'Strike tie: both land');
+  assert.equal(resolve('willow', 'gate').rule, 'Guard tie: nothing happens');
+  assert.deepEqual(resolve('blade', 'crane').partsA, ['Crane in Still Water misses', 'Broken Blade cost 4']);
+});

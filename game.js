@@ -63,57 +63,98 @@ function newGame(player, ai, rng = Math.random) {
   return { player: newFighter(player, rng), ai: newFighter(ai, rng), round: 1, log: [], last: null, over: false, winner: null };
 }
 
-// Damage a card inflicts on a Broken Blade user, who takes the hit unopposed.
-function hitValue(card, dmg) {
-  return card.id === 'crane' ? 0 : dmg;
+const cap = (w) => w[0].toUpperCase() + w.slice(1);
+
+// The damage one card deals to another, with each contributing part named
+// so the player can see where the number came from.
+function hit(card, weaponId, target, { softened = true } = {}) {
+  const parts = [`${card.name} ${card.damage}`];
+  let total = card.damage;
+  const mod = WEAPONS[weaponId].mods[card.family] || 0;
+  if (mod) { total += mod; parts.push(`${WEAPONS[weaponId].name} ${mod > 0 ? '+' : ''}${mod}`); }
+  if (softened && target.loseMod) { total += target.loseMod; parts.push(`${target.name} ${target.loseMod}`); }
+  return { total: Math.max(0, total), parts };
 }
 
-// Returns damage dealt to each side and a line for the log.
-// `a` and `b` are card ids; results are from a's point of view (a = player).
+// Decides who wins a clash and why. `a` and `b` are card ids; results are from
+// a's point of view (a = player). Returns HP and posture damage for each side,
+// `rule` (the rule that decided it), `text` (what happened), and `partsA` /
+// `partsB` (how each side's HP loss adds up).
 function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
   const a = CARDS[aId];
   const b = CARDS[bId];
-  const da = cardDamage(aId, aWeapon);
-  const db = cardDamage(bId, bWeapon);
-  const r = { toA: 0, toB: 0, postureToA: 0, postureToB: 0, text: '' };
+  const r = { toA: 0, toB: 0, postureToA: 0, postureToB: 0, partsA: [], partsB: [], rule: '', text: '' };
 
   if (a.id === 'blade' || b.id === 'blade') {
-    // Each side takes the other card's hit; a Blade also costs its user.
-    r.toA = hitValue(b, db) + (a.selfCost || 0);
-    r.toB = hitValue(a, da) + (b.selfCost || 0);
-    r.text = 'A Broken Blade: blows land on both sides.';
+    // Each side takes the other card's hit (a Crane misses anything but a
+    // Strike); a Blade also costs its user. No posture either way.
+    const sideHit = (card, weapon, target) => (card.id === 'crane'
+      ? { total: 0, parts: [`${card.name} misses`] }
+      : hit(card, weapon, target, { softened: false }));
+    const onA = sideHit(b, bWeapon, a);
+    const onB = sideHit(a, aWeapon, b);
+    r.toA = onA.total + (a.selfCost || 0);
+    r.toB = onB.total + (b.selfCost || 0);
+    r.partsA = [...onA.parts, ...(a.selfCost ? [`Broken Blade cost ${a.selfCost}`] : [])];
+    r.partsB = [...onB.parts, ...(b.selfCost ? [`Broken Blade cost ${b.selfCost}`] : [])];
+    r.rule = 'Broken Blade: no winner';
+    r.text = 'A Broken Blade takes the enemy hit to land its own. Both sides are hurt.';
     return r;
   }
 
-  let winner = null; // 'a', 'b', 'trade' or null (no damage)
+  let winner = null; // 'a', 'b', 'trade' or null (nothing happens)
   if (a.id === 'crane' || b.id === 'crane') {
-    if (a.id === 'crane' && b.id === 'crane') winner = null;
-    else if (a.id === 'crane') winner = b.family === 'strike' ? 'a' : 'b';
-    else winner = a.family === 'strike' ? 'b' : 'a';
+    const crane = a.id === 'crane' ? a : b;
+    const other = crane === a ? b : a;
+    if (a.id === b.id) {
+      r.rule = 'Crane meets Crane';
+      r.text = 'Both fighters wait for a Strike that never comes. Nothing happens.';
+    } else if (other.family === 'strike') {
+      winner = crane === a ? 'a' : 'b';
+      r.rule = 'Crane beats any Strike';
+      r.text = `${crane.name} counters the ${other.name} strike.`;
+    } else {
+      winner = crane === a ? 'b' : 'a';
+      r.rule = 'Crane loses to anything but a Strike';
+      r.text = `${crane.name} waits for a Strike, and ${other.name} (${cap(other.family)}) catches it off guard.`;
+    }
   } else if (a.family === b.family) {
-    if (a.winsTies && !b.winsTies) winner = 'a';
-    else if (b.winsTies && !a.winsTies) winner = 'b';
-    else if (a.family === 'strike') winner = 'trade';
+    const fam = cap(a.family);
+    if (a.winsTies && !b.winsTies) {
+      winner = 'a';
+      r.rule = `${fam} tie: ${a.name} wins ties`;
+      r.text = `Both played ${fam}. ${a.name} wins ${fam} ties.`;
+    } else if (b.winsTies && !a.winsTies) {
+      winner = 'b';
+      r.rule = `${fam} tie: ${b.name} wins ties`;
+      r.text = `Both played ${fam}. ${b.name} wins ${fam} ties.`;
+    } else if (a.family === 'strike') {
+      winner = 'trade';
+      r.rule = 'Strike tie: both land';
+      r.text = 'Both played Strike, and neither wins the tie, so both blows land.';
+    } else {
+      r.rule = `${fam} tie: nothing happens`;
+      r.text = `Both played ${fam}, and neither wins the tie. Nothing happens.`;
+    }
   } else {
     winner = BEATS[a.family] === b.family ? 'a' : 'b';
+    const w = winner === 'a' ? a : b;
+    const l = winner === 'a' ? b : a;
+    r.rule = `${cap(w.family)} beats ${cap(l.family)}`;
+    r.text = `${w.name} (${cap(w.family)}) beats ${l.name} (${cap(l.family)}).`;
   }
 
   if (winner === 'trade') {
-    r.toA = db;
-    r.toB = da;
-    r.postureToA = b.posture;
-    r.postureToB = a.posture;
-    r.text = 'Both strikes land.';
+    const onA = hit(b, bWeapon, a, { softened: false });
+    const onB = hit(a, aWeapon, b, { softened: false });
+    [r.toA, r.partsA, r.postureToA] = [onA.total, onA.parts, b.posture];
+    [r.toB, r.partsB, r.postureToB] = [onB.total, onB.parts, a.posture];
   } else if (winner === 'a') {
-    r.toB = Math.max(0, da + (b.loseMod || 0));
-    r.postureToB = a.posture;
-    r.text = `${a.name} beats ${b.name}.`;
+    const onB = hit(a, aWeapon, b);
+    [r.toB, r.partsB, r.postureToB] = [onB.total, onB.parts, a.posture];
   } else if (winner === 'b') {
-    r.toA = Math.max(0, db + (a.loseMod || 0));
-    r.postureToA = b.posture;
-    r.text = `${b.name} beats ${a.name}.`;
-  } else {
-    r.text = 'The forms cancel out.';
+    const onA = hit(b, bWeapon, a);
+    [r.toA, r.partsA, r.postureToA] = [onA.total, onA.parts, b.posture];
   }
   return r;
 }
@@ -170,11 +211,13 @@ function playRound(state, playerIndex, aiIndex) {
   const toPlayer = r.toA + (pBroke ? DEATHBLOW : 0);
   const toAi = r.toB + (aBroke ? DEATHBLOW : 0);
   state.last = {
-    round: state.round, player: pCard, ai: aCard, text: r.text,
+    round: state.round, player: pCard, ai: aCard, rule: r.rule, text: r.text,
+    partsPlayer: [...r.partsA, ...(pBroke ? [`Deathblow ${DEATHBLOW}`] : [])],
+    partsAi: [...r.partsB, ...(aBroke ? [`Deathblow ${DEATHBLOW}`] : [])],
     toPlayer, toAi, postureToPlayer: r.postureToA, postureToAi: r.postureToB, pBroke, aBroke,
   };
   const breaks = (pBroke ? ' Your guard breaks: deathblow!' : '') + (aBroke ? ' The enemy guard breaks: deathblow!' : '');
-  state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.text}${breaks} (You -${toPlayer}, Enemy -${toAi})`);
+  state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.rule}. ${r.text}${breaks} (You -${toPlayer}, Enemy -${toAi})`);
 
   draw(p, HAND_SIZE - p.hand.length);
   draw(ai, HAND_SIZE - ai.hand.length);

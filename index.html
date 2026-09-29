@@ -61,7 +61,9 @@
   .clash .you { grid-area: you; } .clash .enemy { grid-area: enemy; }
   .clash .mid { grid-area: mid; text-align: center; min-width: 0; }
   .clash .vs { font-size: .75rem; color: var(--muted); letter-spacing: .1em; }
-  .clash .result { font-weight: 600; margin-top: 4px; }
+  .clash .rule { font-size: 1.15rem; font-weight: 700; margin-top: 4px; text-wrap: balance; }
+  .clash .result { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+  .clash .why { font-size: .75rem; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
   .clash .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); }
   .clash.fresh .card { animation: deal .25s ease-out; }
   @keyframes deal { from { transform: translateY(-8px); opacity: 0; } }
@@ -178,13 +180,15 @@
     }
     const pClass = last.toPlayer < last.toAi ? 'won' : last.toPlayer > last.toAi ? 'lost' : '';
     const aClass = last.toAi < last.toPlayer ? 'won' : last.toAi > last.toPlayer ? 'lost' : '';
-    const hit = (n, pos, broke) => `<div class="hit ${n ? 'hurt' : ''}">${n ? `-${n} HP` : 'No damage'}</div>`
-      + (pos ? `<div class="hit">+${pos} posture</div>` : '')
+    // What one side took, with the parts that add up to it. `from` is the card that hit them.
+    const hit = (n, parts, pos, from, broke) => `<div class="hit ${n ? 'hurt' : ''}">${n ? `-${n} HP` : 'No damage'}</div>`
+      + (n ? `<div class="why">${parts.join(', ')}</div>` : '')
+      + (pos ? `<div class="hit">+${pos} posture</div><div class="why">from ${CARDS[from].name}</div>` : '')
       + (broke ? `<div class="hit hurt">Guard broken: deathblow -${DEATHBLOW}</div>` : '');
     el.innerHTML = `
-      <div class="slot you"><div class="who">You</div>${cardFace(last.player, state.player.weapon, 'div', '', pClass)}${hit(last.toPlayer, last.postureToPlayer, last.pBroke)}</div>
-      <div class="mid"><div class="vs">ROUND ${last.round}</div><div class="result">${last.text}</div></div>
-      <div class="slot enemy"><div class="who">Enemy</div>${cardFace(last.ai, state.ai.weapon, 'div', '', aClass)}${hit(last.toAi, last.postureToAi, last.aBroke)}</div>`;
+      <div class="slot you"><div class="who">You</div>${cardFace(last.player, state.player.weapon, 'div', '', pClass)}${hit(last.toPlayer, last.partsPlayer, last.postureToPlayer, last.ai, last.pBroke)}</div>
+      <div class="mid"><div class="vs">ROUND ${last.round}</div><div class="rule">${last.rule}</div><div class="result">${last.text}</div></div>
+      <div class="slot enemy"><div class="who">Enemy</div>${cardFace(last.ai, state.ai.weapon, 'div', '', aClass)}${hit(last.toAi, last.partsAi, last.postureToAi, last.player, last.aBroke)}</div>`;
     el.classList.remove('fresh');
     void el.offsetWidth; // restart the deal animation
     el.classList.add('fresh');
