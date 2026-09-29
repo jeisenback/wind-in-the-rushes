@@ -96,7 +96,7 @@ test('a full posture bar breaks the guard for a deathblow', () => {
   assert.equal(s.last.toAi, 4 + DEATHBLOW);
 });
 
-test('posture recovers only when untouched, and not below half HP', () => {
+test('posture recovers 1 when untouched, at any HP', () => {
   const s = rigged('hawk', 'sparrow');
   s.player.posture = 3;
   playRound(s, 0, 0);
@@ -105,7 +105,7 @@ test('posture recovers only when untouched, and not below half HP', () => {
   low.player.posture = 3;
   low.player.hp = 9;
   playRound(low, 0, 0);
-  assert.equal(low.player.posture, 3);
+  assert.equal(low.player.posture, 2);
 });
 
 test('results name the deciding rule and the damage parts', () => {
@@ -138,4 +138,32 @@ test('the AI never picks a Broken Blade it cannot play', () => {
   s.ai.hp = 10;
   const picks = new Set(Array.from({ length: 200 }, () => aiChoose(s)));
   assert.ok(picks.has(0));
+});
+
+test('Clarity reveals an enemy card only to a desperate fighter', () => {
+  const s = rigged('gate', 'gate');
+  assert.deepEqual(s.clarity, { player: null, ai: null });
+  s.player.hp = 10;
+  playRound(s, 0, 0);
+  assert.ok(Number.isInteger(s.clarity.player));
+  assert.ok(s.clarity.player >= 0 && s.clarity.player < s.ai.hand.length);
+  assert.equal(s.clarity.ai, null);
+});
+
+test('the AI counters a card it sees through Clarity', () => {
+  const s = newGame({}, {});
+  s.player.hand = ['hawk', 'sparrow', 'mist', 'gate'];
+  s.ai.hand = ['sparrow', 'willow', 'mist', 'needle'];
+  s.ai.hp = 10;
+  s.clarity = { player: null, ai: 0 }; // the AI sees Falling Hawk
+  for (let i = 0; i < 50; i++) assert.equal(aiChoose(s), 1); // Willow Bends
+});
+
+test('Clarity counters use a real counter, not Broken Blade', () => {
+  const s = newGame({}, {});
+  s.player.hand = ['gate', 'hawk', 'hawk', 'hawk'];
+  s.ai.hand = ['blade', 'sparrow', 'gate', 'gate'];
+  s.ai.hp = 10;
+  s.clarity = { player: null, ai: 0 }; // the AI sees Iron Gate
+  for (let i = 0; i < 50; i++) assert.equal(aiChoose(s), 1); // Sparrow Turns
 });

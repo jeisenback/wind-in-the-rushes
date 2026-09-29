@@ -40,6 +40,12 @@
   button.card:hover:not(:disabled), button.card:focus-visible { outline: 2px solid var(--fam); outline-offset: 2px; }
   button.card:disabled { opacity: .5; cursor: default; }
   button.card.locked { border-style: dashed; }
+  /* Clarity: the enemy card you see, and your card the enemy sees. */
+  .back.revealed { background: var(--panel); border: 2px solid var(--fam); }
+  .clarity .meta { margin-top: 0; }
+  .clarity { font-size: .85rem; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .card.seen::after { content: 'The enemy sees this card'; display: block; margin-top: 6px;
+                      font-size: .7rem; font-weight: 700; color: var(--strike); }
   .card .fam { color: var(--fam); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
   .card .stats { font-size: .75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
   .card .name { font-weight: 700; margin: 2px 0; }
@@ -84,7 +90,9 @@
   <h1>Wind in the Rushes</h1>
   <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.<br>
     Losing a clash fills your posture. A full bar of 8 breaks your guard for a 5-damage deathblow.
-    Posture recovers 1 each round you take none, but not at 10 HP or less.</p>
+    Posture recovers 1 each round you take none.<br>
+    At 10 HP or less you gain Clarity: each round one random enemy card is revealed, and Broken Blade unlocks.
+    The enemy gains the same when it is that low.</p>
   <div class="controls">
     <label for="style">Your style</label>
     <select id="style"></select>
@@ -106,6 +114,7 @@
       <div class="hp posture">Posture <div class="bar pos" id="aPosBar"><div id="aPos"></div></div> <span class="num" id="aPosN"></span></div>
       <div class="meta" id="aMeta"></div>
       <div class="hand" id="aHand" style="margin-top:8px"></div>
+      <div class="clarity" id="aClarity" hidden></div>
       <h2>Enemy discards</h2>
       <div class="pile" id="aPile"></div>
     </div>
@@ -208,14 +217,24 @@
     }
     $('pMeta').textContent = `${styleSummary(p.style)} | ${weaponSummary(p.weapon)} | Deck: ${p.deck.length}`;
     $('aMeta').textContent = `${styleSummary(ai.style)} | ${weaponSummary(ai.weapon)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}`;
-    $('aHand').innerHTML = ai.hand.map(() => '<div class="back"></div>').join('');
+    const seen = state.over ? null : state.clarity.player;
+    $('aHand').innerHTML = ai.hand
+      .map((id, i) => (i === seen ? `<div class="back revealed ${CARDS[id].family}"></div>` : '<div class="back"></div>'))
+      .join('');
+    $('aClarity').hidden = seen == null;
+    if (seen != null) {
+      const id = ai.hand[seen];
+      $('aClarity').innerHTML = `<strong>Clarity:</strong> they hold ${chip(id)}
+        <span class="meta">${CARDS[id].family}, ${cardDamage(id, ai.weapon)} dmg, ${CARDS[id].posture} posture</span>`;
+    }
     $('pPile').innerHTML = p.discard.map(chip).join('');
     $('aPile').innerHTML = ai.discard.map(chip).join('');
     $('pHand').innerHTML = p.hand
       .map((id, i) => {
         const locked = !canPlay(p, i);
         const attrs = `data-i="${i}" ${state.over || locked ? 'disabled' : ''} ${locked ? 'title="Unlocks at 10 HP or less"' : ''}`;
-        return cardFace(id, p.weapon, 'button', attrs, locked ? 'locked' : '');
+        const classes = [locked ? 'locked' : '', !state.over && state.clarity.ai === i ? 'seen' : ''].join(' ');
+        return cardFace(id, p.weapon, 'button', attrs, classes);
       })
       .join('');
     renderClash();

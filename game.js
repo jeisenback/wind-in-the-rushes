@@ -60,7 +60,7 @@ function newFighter({ style = 'balanced', weapon = 'sword' } = {}, rng) {
 
 // `player` and `ai` are { style, weapon } choices.
 function newGame(player, ai, rng = Math.random) {
-  return { player: newFighter(player, rng), ai: newFighter(ai, rng), round: 1, log: [], last: null, over: false, winner: null };
+  return { player: newFighter(player, rng), ai: newFighter(ai, rng), round: 1, log: [], last: null, clarity: { player: null, ai: null }, over: false, winner: null };
 }
 
 const cap = (w) => w[0].toUpperCase() + w.slice(1);
@@ -159,8 +159,7 @@ function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
   return r;
 }
 
-// v1 AI: random pick, weighted toward cards that beat the player's last family.
-// Badly hurt: at half HP or less. Posture stops recovering, and desperate cards unlock.
+// Badly hurt: at half HP or less. Grants Clarity and unlocks desperate cards.
 function isDesperate(f) {
   return f.hp <= START_HP / 2;
 }
@@ -170,8 +169,30 @@ function canPlay(f, index) {
   return !CARDS[f.hand[index]].desperate || isDesperate(f) || f.hand.length === 1;
 }
 
+// Clarity: each round, a desperate fighter sees one random card in the enemy hand.
+// Stored as an index into the enemy hand, or null.
+function rollClarity(state, rng) {
+  const pick = (me, them) => (isDesperate(me) && them.hand.length ? Math.floor(rng() * them.hand.length) : null);
+  state.clarity = { player: pick(state.player, state.ai), ai: pick(state.ai, state.player) };
+}
+
+// AI: with Clarity, play the card that does best against the revealed card, if any
+// card comes out ahead. Otherwise pick at random, weighted toward cards that beat
+// the player's last family.
 function aiChoose(state, rng = Math.random) {
   const hand = state.ai.hand;
+  const seenIdx = state.clarity && state.clarity.ai;
+  if (seenIdx != null) {
+    const seen = state.player.hand[seenIdx];
+    let best = -1, bestNet = 0;
+    hand.forEach((id, i) => {
+      // Broken Blade does the same thing whatever it meets, so it is no answer to what Clarity shows.
+      if (!canPlay(state.ai, i) || id === 'blade') return;
+      const r = resolve(id, seen, state.ai.weapon, state.player.weapon);
+      if (r.toB - r.toA > bestNet) { best = i; bestNet = r.toB - r.toA; }
+    });
+    if (best >= 0) return best;
+  }
   const last = state.player.discard[state.player.discard.length - 1];
   const lastFamily = last && CARDS[last].family;
   const weights = hand.map((id, i) => {
@@ -189,12 +210,12 @@ function aiChoose(state, rng = Math.random) {
   return weights.findLastIndex((w) => w > 0);
 }
 
-// Adds posture damage, or recovers 1 if none was taken (none at all below half HP).
+// Adds posture damage, or recovers 1 if none was taken.
 // On a full bar the guard breaks: a deathblow lands and the bar resets.
 // Returns true if the guard broke.
 function applyPosture(f, taken) {
   if (taken > 0) f.posture += taken;
-  else f.posture = Math.max(0, f.posture - (isDesperate(f) ? 0 : 1));
+  else f.posture = Math.max(0, f.posture - 1);
   if (f.posture < POSTURE_MAX) return false;
   f.hp -= DEATHBLOW;
   f.posture = 0;
@@ -206,7 +227,7 @@ function draw(f, n) {
 }
 
 // Plays one round. Mutates and returns state.
-function playRound(state, playerIndex, aiIndex) {
+function playRound(state, playerIndex, aiIndex, rng = Math.random) {
   const p = state.player;
   const ai = state.ai;
   if (!canPlay(p, playerIndex) || !canPlay(ai, aiIndex)) throw new Error('That card cannot be played yet.');
@@ -234,6 +255,7 @@ function playRound(state, playerIndex, aiIndex) {
   draw(p, HAND_SIZE - p.hand.length);
   draw(ai, HAND_SIZE - ai.hand.length);
   state.round++;
+  rollClarity(state, rng);
 
   const dead = p.hp <= 0 || ai.hp <= 0;
   if (dead || p.hand.length === 0 || ai.hand.length === 0) {

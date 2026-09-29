@@ -40,21 +40,34 @@ Ties: Strike vs Strike trades (both deal damage). Guard vs Guard and Flow vs Flo
 Borrowed from Sekiro. Each fighter has a posture bar of 8.
 
 - Losing a clash adds the winning card's posture value to your bar. A Strike trade fills both bars. Broken Blade deals no posture.
-- A round where you take no posture recovers 1, but not at 10 HP or less.
+- A round where you take no posture recovers 1.
 - A full bar breaks your guard: you take a 5-damage deathblow and the bar resets to 0.
 
 ## Desperation
 
-At 10 HP or less (half of starting HP) you are desperate: posture stops
-recovering, and Broken Blade unlocks. Broken Blade is also playable if it is
-the last card in your hand.
+At 10 HP or less (half of starting HP) you are desperate, which gives you two
+tools:
+
+- **Clarity:** each round, one random card in the enemy hand is revealed to
+  you. The AI gets the same when it is desperate, and plays the best counter
+  to the card it sees (never Broken Blade, which ignores what it meets). Your
+  card the enemy can see is marked.
+- **Broken Blade** unlocks. It is also playable if it is the last card in
+  your hand.
+
+An information boost was chosen over a damage boost (Tekken-style rage).
+In simulation, +1 or +2 damage when desperate lifted comebacks only to 13-15%,
+while making a lead feel fragile. Stopping posture recovery at low HP had no
+measurable effect, so that rule was dropped.
 
 ## Simulation (1,000 AI-vs-AI games, random loadouts)
 
-After locking Broken Blade behind desperation: games run about 8.5 rounds,
-90% have at least one guard break, and 15% end on a deathblow. Broken Blade
-decides 9% of rounds, down from 16%. Sparrow Turns is the weakest card
-(about -0.6 HP per play) and Storm + Staff the weakest loadout (about 34%).
+With Broken Blade locked and Clarity in: games run about 9 rounds, 90% have
+at least one guard break, and 17% end on a deathblow. The fighter who drops to
+half HP first comes back to win 17% of the time (10% without Clarity). Broken
+Blade decides 7% of rounds. Sparrow Turns is still the weakest card (about
+-0.5 HP per play). Loadouts range from about 37% (Stream + Greatblade,
+Storm + Staff) to 62% (Stone + Staff).
 
 ## Fighting styles
 
