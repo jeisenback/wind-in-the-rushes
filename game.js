@@ -57,7 +57,7 @@ function newFighter({ style = 'balanced', weapon = 'sword' } = {}, rng) {
 
 // `player` and `ai` are { style, weapon } choices.
 function newGame(player, ai, rng = Math.random) {
-  return { player: newFighter(player, rng), ai: newFighter(ai, rng), round: 1, log: [], over: false, winner: null };
+  return { player: newFighter(player, rng), ai: newFighter(ai, rng), round: 1, log: [], last: null, over: false, winner: null };
 }
 
 // Damage a card inflicts on a Broken Blade user, who takes the hit unopposed.
@@ -146,6 +146,7 @@ function playRound(state, playerIndex, aiIndex) {
   const r = resolve(pCard, aCard, p.weapon, ai.weapon);
   p.hp -= r.toA;
   ai.hp -= r.toB;
+  state.last = { round: state.round, player: pCard, ai: aCard, toPlayer: r.toA, toAi: r.toB, text: r.text };
   state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.text} (You -${r.toA}, Enemy -${r.toB})`);
 
   draw(p, HAND_SIZE - p.hand.length);

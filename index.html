@@ -39,6 +39,25 @@
   .flow { --fam: var(--flow); } .special { --fam: var(--special); }
   .pile { display: flex; flex-wrap: wrap; gap: 4px; }
   .chip { font-size: .75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--fam); color: var(--fam); }
+  .clash { display: grid; grid-template-columns: minmax(0, 170px) minmax(0, 1fr) minmax(0, 170px);
+           grid-template-areas: "you mid enemy"; gap: 12px; align-items: center; justify-content: center; margin: 12px 0;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .clash .slot { display: grid; gap: 6px; justify-items: center; min-width: 0; }
+  .clash .who { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .clash .card { width: 100%; }
+  .clash .card.won { border-width: 4px; }
+  .clash .card.lost { opacity: .6; }
+  .clash .hit { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .clash .hit.hurt { color: var(--strike); }
+  .clash .you { grid-area: you; } .clash .enemy { grid-area: enemy; }
+  .clash .mid { grid-area: mid; text-align: center; min-width: 0; }
+  .clash .vs { font-size: .75rem; color: var(--muted); letter-spacing: .1em; }
+  .clash .result { font-weight: 600; margin-top: 4px; }
+  .clash .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); }
+  .clash.fresh .card { animation: deal .25s ease-out; }
+  @keyframes deal { from { transform: translateY(-8px); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .clash.fresh .card { animation: none; } }
+  @media (max-width: 480px) { .clash { grid-template-columns: 1fr 1fr; grid-template-areas: "you enemy" "mid mid"; gap: 8px; padding: 8px; } .clash .card { min-height: 0; padding: 6px; } .clash .text { display: none; } }
   #banner { font-size: 1.1rem; font-weight: 700; margin: 12px 0; min-height: 1.4em; }
   #log { list-style: none; padding: 0; font-size: .85rem; color: var(--muted); max-height: 220px; overflow-y: auto; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
@@ -76,6 +95,7 @@
     </div>
   </div>
 
+  <div class="clash" id="clash"></div>
   <div id="banner"></div>
   <h2>Your hand</h2>
   <div class="hand" id="pHand"></div>
@@ -124,6 +144,36 @@
     return `<span class="chip ${c.family}">${c.name}</span>`;
   }
 
+  // One card face; `tag` is 'button' for the playable hand, 'div' elsewhere.
+  function cardFace(id, weapon, tag = 'div', attrs = '', extraClass = '') {
+    const c = CARDS[id];
+    return `<${tag} class="card ${c.family} ${extraClass}" ${attrs}>
+      <div class="fam">${c.family} | ${cardDamage(id, weapon)} dmg</div>
+      <div class="name">${c.name}</div>
+      <div class="text">${c.text}</div>
+    </${tag}>`;
+  }
+
+  // The last exchange: both cards face up, who took what, and the result.
+  function renderClash() {
+    const last = state.last;
+    const el = $('clash');
+    if (!last) {
+      el.innerHTML = '<div class="empty">Play a card from your hand. Both cards will show here.</div>';
+      return;
+    }
+    const pClass = last.toPlayer < last.toAi ? 'won' : last.toPlayer > last.toAi ? 'lost' : '';
+    const aClass = last.toAi < last.toPlayer ? 'won' : last.toAi > last.toPlayer ? 'lost' : '';
+    const hit = (n) => `<div class="hit ${n ? 'hurt' : ''}">${n ? `-${n} HP` : 'No damage'}</div>`;
+    el.innerHTML = `
+      <div class="slot you"><div class="who">You</div>${cardFace(last.player, state.player.weapon, 'div', '', pClass)}${hit(last.toPlayer)}</div>
+      <div class="mid"><div class="vs">ROUND ${last.round}</div><div class="result">${last.text}</div></div>
+      <div class="slot enemy"><div class="who">Enemy</div>${cardFace(last.ai, state.ai.weapon, 'div', '', aClass)}${hit(last.toAi)}</div>`;
+    el.classList.remove('fresh');
+    void el.offsetWidth; // restart the deal animation
+    el.classList.add('fresh');
+  }
+
   function render() {
     const { player: p, ai } = state;
     $('pHp').textContent = `${Math.max(0, p.hp)} / ${START_HP}`;
@@ -135,14 +185,10 @@
     $('aHand').innerHTML = ai.hand.map(() => '<div class="back"></div>').join('');
     $('pPile').innerHTML = p.discard.map(chip).join('');
     $('aPile').innerHTML = ai.discard.map(chip).join('');
-    $('pHand').innerHTML = p.hand.map((id, i) => {
-      const c = CARDS[id];
-      return `<button class="card ${c.family}" data-i="${i}" ${state.over ? 'disabled' : ''}>
-        <div class="fam">${c.family} | ${cardDamage(id, state.player.weapon)} dmg</div>
-        <div class="name">${c.name}</div>
-        <div class="text">${c.text}</div>
-      </button>`;
-    }).join('');
+    $('pHand').innerHTML = p.hand
+      .map((id, i) => cardFace(id, p.weapon, 'button', `data-i="${i}" ${state.over ? 'disabled' : ''}`))
+      .join('');
+    renderClash();
     $('log').innerHTML = state.log.slice().reverse().map((l) => `<li>${l}</li>`).join('');
     $('banner').textContent = state.over
       ? { player: 'Victory.', ai: 'Defeat.', draw: 'A draw.' }[state.winner]
