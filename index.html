@@ -202,6 +202,9 @@
     render();
   });
   $('newGame').addEventListener('click', start);
+  // A new loadout only makes sense from round 1, so changing either one restarts.
+  $('style').addEventListener('change', start);
+  $('weapon').addEventListener('change', start);
   start();
 </script>
 </body>
