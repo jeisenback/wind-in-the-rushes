@@ -13,7 +13,7 @@ const AI_TEMPERATURE = 1;
 const BEATS = { strike: 'flow', flow: 'guard', guard: 'strike' };
 
 const CARDS = {
-  hawk:   { id: 'hawk',   name: 'Falling Hawk',         family: 'strike',  damage: 4, posture: 4, text: 'A heavy blow that staggers.' },
+  hawk:   { id: 'hawk',   name: 'Falling Hawk',         family: 'strike',  damage: 4, posture: 4, loseMod: -1, text: 'A braced, heavy blow. Take 1 less damage if this loses.' },
   needle: { id: 'needle', name: 'Quick Needle',         family: 'strike',  damage: 2, posture: 2, winsTies: true, text: 'Wins Strike ties instead of trading.' },
   gate:   { id: 'gate',   name: 'Iron Gate',            family: 'guard',   damage: 2, posture: 2, loseMod: -1, text: 'Take 1 less damage if this loses.' },
   willow: { id: 'willow', name: 'Willow Bends',         family: 'guard',   damage: 3, posture: 3, text: 'A deflect and counter.' },
@@ -26,7 +26,7 @@ const CARDS = {
 // A fighting style is a named deck list of 12 cards.
 const STYLES = {
   balanced: { name: 'Balanced', deck: ['hawk', 'hawk', 'needle', 'needle', 'gate', 'gate', 'willow', 'mist', 'mist', 'sparrow', 'crane', 'blade'] },
-  storm:    { name: 'Storm',    deck: ['hawk', 'hawk', 'hawk', 'needle', 'needle', 'needle', 'gate', 'willow', 'mist', 'sparrow', 'sparrow', 'blade'] },
+  storm:    { name: 'Storm',    deck: ['hawk', 'hawk', 'needle', 'needle', 'needle', 'gate', 'willow', 'mist', 'sparrow', 'sparrow', 'sparrow', 'blade'] },
   stone:    { name: 'Stone',    deck: ['hawk', 'needle', 'gate', 'gate', 'gate', 'willow', 'willow', 'mist', 'sparrow', 'sparrow', 'crane', 'blade'] },
   stream:   { name: 'Stream',   deck: ['hawk', 'needle', 'gate', 'willow', 'mist', 'mist', 'mist', 'sparrow', 'sparrow', 'sparrow', 'crane', 'blade'] },
 };
@@ -60,7 +60,7 @@ function newFighter({ style = 'balanced', weapon = 'sword' } = {}, rng) {
   const cards = STYLES[style].deck;
   const deck = shuffle(cards.filter((id) => !CARDS[id].reserve), rng);
   const reserve = cards.filter((id) => CARDS[id].reserve);
-  return { style, weapon, hp: START_HP, posture: 0, hand: deck.splice(0, HAND_SIZE), deck, reserve, discard: [] };
+  return { style, weapon, hp: START_HP, posture: 0, hand: deck.splice(0, HAND_SIZE), deck, reserve, discard: [], played: [] };
 }
 
 // `player` and `ai` are { style, weapon } choices.
@@ -198,9 +198,10 @@ function predictPlay(state) {
   for (const id of STYLES[opp.style].deck) pool[id] = (pool[id] || 0) + 1;
   for (const id of opp.discard) pool[id]--;
   for (const id of STYLES[opp.style].deck.filter((c) => CARDS[c].reserve)) {
-    // A reserve card is certainly in hand once desperate (unless already played), otherwise nowhere.
-    if (pool[id] > 0 && isDesperate(opp) && !known.includes(id)) known.push(id);
-    pool[id] = 0;
+    // Still in reserve: not in play. Joined but never played: certainly in hand.
+    // Played before: an ordinary card, in the discard or reshuffled into the deck.
+    if (opp.reserve.includes(id)) pool[id] = 0;
+    else if (!opp.played.includes(id)) { if (!known.includes(id)) known.push(id); pool[id] = 0; }
   }
   for (const id of known) if (pool[id] > 0) pool[id]--;
   const poolTotal = Object.values(pool).reduce((a, b) => a + b, 0);
@@ -255,8 +256,20 @@ function applyPosture(f, taken) {
   return true;
 }
 
-function draw(f, n) {
-  f.hand.push(...f.deck.splice(0, n));
+// Draws n cards. An empty deck is rebuilt by shuffling the discard pile.
+// Returns true if a reshuffle happened.
+function draw(f, n, rng) {
+  let reshuffled = false;
+  for (let i = 0; i < n; i++) {
+    if (!f.deck.length) {
+      if (!f.discard.length) break;
+      f.deck = shuffle(f.discard, rng);
+      f.discard = [];
+      reshuffled = true;
+    }
+    f.hand.push(f.deck.shift());
+  }
+  return reshuffled;
 }
 
 // Plays one round. Mutates and returns state.
@@ -267,6 +280,8 @@ function playRound(state, playerIndex, aiIndex, rng = Math.random) {
   const aCard = ai.hand.splice(aiIndex, 1)[0];
   p.discard.push(pCard);
   ai.discard.push(aCard);
+  p.played.push(pCard);
+  ai.played.push(aCard);
 
   const r = resolve(pCard, aCard, p.weapon, ai.weapon);
   p.hp -= r.toA;
@@ -284,8 +299,8 @@ function playRound(state, playerIndex, aiIndex, rng = Math.random) {
   const breaks = (pBroke ? ' Your guard breaks: deathblow!' : '') + (aBroke ? ' The enemy guard breaks: deathblow!' : '');
   state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.rule}. ${r.text}${breaks} (You -${toPlayer}, Enemy -${toAi})`);
 
-  draw(p, HAND_SIZE - p.hand.length);
-  draw(ai, HAND_SIZE - ai.hand.length);
+  if (draw(p, HAND_SIZE - p.hand.length, rng)) state.log.push('Your discard pile is shuffled into a new deck.');
+  if (draw(ai, HAND_SIZE - ai.hand.length, rng)) state.log.push('The enemy discard pile is shuffled into a new deck.');
   state.last.joined = { player: joinReserve(p), ai: joinReserve(ai) };
   if (state.last.joined.player) state.log.push('Broken Blade joins your hand.');
   if (state.last.joined.ai) state.log.push('Broken Blade joins the enemy hand.');
@@ -293,7 +308,7 @@ function playRound(state, playerIndex, aiIndex, rng = Math.random) {
   rollClarity(state, rng);
 
   const dead = p.hp <= 0 || ai.hp <= 0;
-  if (dead || p.hand.length === 0 || ai.hand.length === 0) {
+  if (dead) {
     state.over = true;
     state.winner = p.hp > ai.hp ? 'player' : ai.hp > p.hp ? 'ai' : 'draw';
   }

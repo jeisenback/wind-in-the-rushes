@@ -6,7 +6,7 @@ const dmg = (a, b) => { const r = resolve(a, b); return [r.toA, r.toB]; };
 
 test('family triangle', () => {
   assert.deepEqual(dmg('sparrow', 'willow'), [0, 4]);
-  assert.deepEqual(dmg('willow', 'hawk'), [0, 3]);
+  assert.deepEqual(dmg('willow', 'hawk'), [0, 2]); // Falling Hawk is braced: 3 - 1
   assert.deepEqual(dmg('hawk', 'sparrow'), [0, 4]);
 });
 
@@ -17,14 +17,15 @@ test('iron gate softens a loss', () => {
 
 test('ties', () => {
   assert.deepEqual(dmg('hawk', 'hawk'), [4, 4]);
-  assert.deepEqual(dmg('needle', 'hawk'), [0, 2]);
+  assert.deepEqual(dmg('needle', 'hawk'), [0, 1]);
   assert.deepEqual(dmg('needle', 'needle'), [2, 2]);
   assert.deepEqual(dmg('mist', 'sparrow'), [0, 2]);
   assert.deepEqual(dmg('willow', 'gate'), [0, 0]);
 });
 
 test('crane', () => {
-  assert.deepEqual(dmg('crane', 'hawk'), [0, 7]);
+  assert.deepEqual(dmg('crane', 'hawk'), [0, 6]);
+  assert.deepEqual(dmg('crane', 'needle'), [0, 7]);
   assert.deepEqual(dmg('crane', 'willow'), [3, 0]);
   assert.deepEqual(dmg('sparrow', 'crane'), [0, 4]);
   assert.deepEqual(dmg('crane', 'crane'), [0, 0]);
@@ -41,7 +42,7 @@ test('full games end with a winner', () => {
     const s = newGame({ style: 'storm', weapon: 'greatblade' }, { style: 'stone', weapon: 'knives' });
     while (!s.over) playRound(s, 0, aiChoose(s));
     assert.ok(['player', 'ai', 'draw'].includes(s.winner));
-    assert.ok(s.round <= 13);
+    assert.ok(s.round < 100); // reshuffles mean no fixed length, but games still finish
   }
 });
 
@@ -167,4 +168,15 @@ test('the AI prefers a real counter to Broken Blade against a known card', () =>
   s.ai.hand = ['blade', 'sparrow', 'gate', 'gate'];
   s.clarity = { player: null, ai: 0 }; // the AI sees Iron Gate
   for (let i = 0; i < 20; i++) assert.equal(aiChoose(s, Math.random, 0.01), 1); // Sparrow Turns
+});
+
+test('an empty deck is rebuilt from the discard pile', () => {
+  const s = rigged('gate', 'gate');
+  s.player.discard.push(...s.player.deck);
+  s.player.deck = [];
+  const cards = s.player.hand.length + s.player.discard.length;
+  playRound(s, 0, 0);
+  assert.equal(s.player.hand.length, 4);
+  assert.equal(s.player.hand.length + s.player.deck.length + s.player.discard.length, cards);
+  assert.ok(s.log.includes('Your discard pile is shuffled into a new deck.'));
 });

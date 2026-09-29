@@ -10,7 +10,8 @@ Play: open `index.html` in a browser. Tests: `node --test`.
 2. Both play one card face down, then reveal.
 3. The winner deals their card's damage.
 4. Both draw back up to 4.
-5. The game ends when a fighter hits 0 HP or a hand is empty. The higher HP wins.
+5. When a deck runs out, that fighter's discard pile is shuffled into a new deck.
+6. The game ends when a fighter reaches 0 HP. If both do in the same round, the higher HP wins.
 
 The enemy's hand is hidden. Both discard piles are public.
 
@@ -26,7 +27,7 @@ Ties: Strike vs Strike trades (both deal damage). Guard vs Guard and Flow vs Flo
 
 | Card | Family | Dmg | Posture | Effect |
 |---|---|---|---|---|
-| Falling Hawk | Strike | 4 | 4 | A heavy blow that staggers |
+| Falling Hawk | Strike | 4 | 4 | A braced, heavy blow. Take 1 less damage if this loses |
 | Quick Needle | Strike | 2 | 2 | Wins Strike ties instead of trading |
 | Iron Gate | Guard | 2 | 2 | Take 1 less damage if this loses |
 | Willow Bends | Guard | 3 | 3 | A deflect and counter |
@@ -80,7 +81,7 @@ styles are shown, so you know the enemy's card mix.
 | Style | Hawk | Needle | Gate | Willow | Mist | Sparrow | Crane | Blade |
 |---|---|---|---|---|---|---|---|---|
 | Balanced | 2 | 2 | 2 | 1 | 2 | 1 | 1 | 1 |
-| Storm (Strike-heavy) | 3 | 3 | 1 | 1 | 1 | 2 | 0 | 1 |
+| Storm (Strike-heavy) | 2 | 3 | 1 | 1 | 1 | 3 | 0 | 1 |
 | Stone (Guard-heavy) | 1 | 1 | 3 | 2 | 1 | 2 | 1 | 1 |
 | Stream (Flow-heavy) | 1 | 1 | 1 | 1 | 3 | 3 | 1 | 1 |
 
@@ -108,8 +109,7 @@ style pays off and mismatching costs; with posture, loadouts range from about
 
 Average net damage of each card against a random card from the Balanced deck
 (first pass, before posture): regular cards all sit between -0.6 and +0.6,
-Crane about +0.8, Broken Blade about +1.5. Games almost always end on HP,
-not on empty hands.
+Crane about +0.8, Broken Blade about +1.5.
 
 ## AI
 
@@ -127,13 +127,21 @@ Head to head over 2,000 games with random loadouts, it beats the previous AI
 (weighted toward beating your last family) about 58% of the time, and random
 play about 64%. The temperature and posture weight barely changed that.
 
-With both sides using this AI (1,000 games): Guard beats Strike becomes the
-most common result, Falling Hawk drops to the weakest card (about -0.7 HP per
-play) and Storm to the weakest style (41-43%). About 9% of games now end on
-empty hands, since the deck is 11 cards with Broken Blade in reserve. The
-fighter who drops to half HP first comes back about 12% of the time.
+With both sides using this AI, Falling Hawk fell to about -0.7 HP per play
+and Storm to 41-43%: an opponent that counts cards answers a Strike-heavy
+deck with Guards. Extra damage or posture on Hawk did not help (it just gets
+blocked). Two changes fixed it:
+
+- Falling Hawk is braced: it takes 1 less damage when it loses.
+- Storm trades a Hawk for a third Sparrow Turns, so it has more Flow to punish
+  the Guards it draws out.
+
+Current numbers (1,000 AI-vs-AI games, reshuffling decks): games run about 9.4
+rounds, 13% end on a deathblow, none end on empty hands. Regular cards sit
+between -0.22 and +0.36 HP per play. Styles sit between 48% and 54% (3,000
+games). The fighter who drops to half HP first comes back about 12% of the
+time.
 
 ## Later, not now
 
-- Retune Falling Hawk and Storm against the smarter AI
 - An AI that learns a player's habits across games
