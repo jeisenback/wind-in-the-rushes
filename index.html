@@ -42,6 +42,9 @@
   /* Clarity: the enemy card you see, and your card the enemy sees. */
   .back.revealed { background: var(--panel); border: 2px solid var(--fam); }
   .clarity .meta { margin-top: 0; }
+  .rules { font-size: .85rem; color: var(--muted); margin: 6px 0 12px; }
+  .rules summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+  .rules ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; max-width: 70ch; }
   .items { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
   .items .meta { margin-top: 0; }
   button.item { font: inherit; font-size: .85rem; padding: 4px 10px; border-radius: 8px; cursor: pointer; text-align: left;
@@ -93,13 +96,21 @@
 <body>
 <main>
   <h1>Wind in the Rushes</h1>
-  <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.<br>
-    Losing a clash fills your posture. A full bar of 8 breaks your guard for a 5-damage deathblow.
-    Posture recovers 1 each round you take none.<br>
-    At 10 HP or less you gain Clarity: each round one random enemy card is revealed, and Broken Blade joins your hand from reserve.
-    The enemy gains the same when it is that low.<br>
-    When your deck runs out, your discard pile is shuffled into a new deck. The fight ends when someone reaches 0 HP.<br>
-    You carry two single-use items. Pick one before playing a card to use it that round; both sides' items are revealed with the cards.</p>
+  <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.</p>
+  <details class="rules">
+    <summary>How to play</summary>
+    <ul>
+      <li>Both fighters play a card face down, then reveal. The winning card deals its damage.</li>
+      <li>Losing a clash fills your posture. A full bar of 8 breaks your guard for a 5-damage deathblow.
+        Posture recovers 1 each round you take none.</li>
+      <li>At 10 HP or less you gain Clarity: each round one random enemy card is revealed, and Broken Blade
+        joins your hand from reserve. The enemy gains the same when it is that low.</li>
+      <li>You carry two single-use items. Pick one before playing a card to use it that round; both sides'
+        items are revealed with the cards.</li>
+      <li>When your deck runs out, your discard pile is shuffled into a new deck. The fight ends when someone
+        reaches 0 HP.</li>
+    </ul>
+  </details>
   <div class="controls">
     <label for="style">Your style</label>
     <select id="style"></select>
