@@ -8,11 +8,13 @@
   :root {
     --bg: #f4f1ea; --panel: #fffdf8; --ink: #222; --muted: #6b665c; --line: #d8d2c4;
     --strike: #b8412f; --guard: #2f5fb8; --flow: #2f8a5a; --special: #7a4fb0;
+    --posture: #b7801a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #1a1916; --panel: #24221e; --ink: #ece8df; --muted: #a39d90; --line: #3a372f;
       --strike: #e0705d; --guard: #6f9be8; --flow: #5dbf8a; --special: #b28ae0;
+      --posture: #e3b04b;
     }
   }
   * { box-sizing: border-box; }
@@ -24,6 +26,12 @@
   .hp { display: flex; align-items: center; gap: 8px; font-weight: 600; }
   .bar { flex: 1; height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
   .bar > div { height: 100%; background: var(--strike); transition: width .3s; }
+  /* Posture fills from the center outward, as in Sekiro. */
+  .hp.posture { font-weight: 400; font-size: .85rem; color: var(--muted); margin-top: 6px; }
+  .bar.pos { height: 6px; display: flex; justify-content: center; }
+  .bar.pos > div { background: var(--posture); }
+  .bar.pos.danger > div { background: var(--strike); }
+  .hp .num { font-variant-numeric: tabular-nums; }
   .meta { color: var(--muted); font-size: .85rem; margin-top: 6px; }
   .hand { display: flex; flex-wrap: wrap; gap: 8px; }
   .card { width: 150px; min-height: 120px; text-align: left; padding: 10px; border-radius: 8px;
@@ -32,6 +40,7 @@
   button.card:hover:not(:disabled) { transform: translateY(-2px); }
   button.card:disabled { opacity: .5; cursor: default; }
   .card .fam { color: var(--fam); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+  .card .stats { font-size: .75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
   .card .name { font-weight: 700; margin: 2px 0; }
   .card .text { font-size: .8rem; color: var(--muted); }
   .back { width: 40px; height: 56px; border-radius: 6px; background: var(--line); }
@@ -70,7 +79,9 @@
 <body>
 <main>
   <h1>Wind in the Rushes</h1>
-  <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.</p>
+  <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.<br>
+    Losing a clash fills your posture. A full bar of 8 breaks your guard for a 5-damage deathblow.
+    Posture recovers 1 each round you take none, but not below half HP.</p>
   <div class="controls">
     <label for="style">Your style</label>
     <select id="style"></select>
@@ -81,13 +92,15 @@
 
   <div class="row">
     <div class="side">
-      <div class="hp">You <div class="bar"><div id="pBar"></div></div> <span id="pHp"></span></div>
+      <div class="hp">You <div class="bar"><div id="pBar"></div></div> <span class="num" id="pHp"></span></div>
+      <div class="hp posture">Posture <div class="bar pos" id="pPosBar"><div id="pPos"></div></div> <span class="num" id="pPosN"></span></div>
       <div class="meta" id="pMeta"></div>
       <h2>Your discards</h2>
       <div class="pile" id="pPile"></div>
     </div>
     <div class="side">
-      <div class="hp">Enemy <div class="bar"><div id="aBar"></div></div> <span id="aHp"></span></div>
+      <div class="hp">Enemy <div class="bar"><div id="aBar"></div></div> <span class="num" id="aHp"></span></div>
+      <div class="hp posture">Posture <div class="bar pos" id="aPosBar"><div id="aPos"></div></div> <span class="num" id="aPosN"></span></div>
       <div class="meta" id="aMeta"></div>
       <div class="hand" id="aHand" style="margin-top:8px"></div>
       <h2>Enemy discards</h2>
@@ -148,7 +161,8 @@
   function cardFace(id, weapon, tag = 'div', attrs = '', extraClass = '') {
     const c = CARDS[id];
     return `<${tag} class="card ${c.family} ${extraClass}" ${attrs}>
-      <div class="fam">${c.family} | ${cardDamage(id, weapon)} dmg</div>
+      <div class="fam">${c.family}</div>
+      <div class="stats">${cardDamage(id, weapon)} dmg | ${c.posture} posture</div>
       <div class="name">${c.name}</div>
       <div class="text">${c.text}</div>
     </${tag}>`;
@@ -164,11 +178,13 @@
     }
     const pClass = last.toPlayer < last.toAi ? 'won' : last.toPlayer > last.toAi ? 'lost' : '';
     const aClass = last.toAi < last.toPlayer ? 'won' : last.toAi > last.toPlayer ? 'lost' : '';
-    const hit = (n) => `<div class="hit ${n ? 'hurt' : ''}">${n ? `-${n} HP` : 'No damage'}</div>`;
+    const hit = (n, pos, broke) => `<div class="hit ${n ? 'hurt' : ''}">${n ? `-${n} HP` : 'No damage'}</div>`
+      + (pos ? `<div class="hit">+${pos} posture</div>` : '')
+      + (broke ? `<div class="hit hurt">Guard broken: deathblow -${DEATHBLOW}</div>` : '');
     el.innerHTML = `
-      <div class="slot you"><div class="who">You</div>${cardFace(last.player, state.player.weapon, 'div', '', pClass)}${hit(last.toPlayer)}</div>
+      <div class="slot you"><div class="who">You</div>${cardFace(last.player, state.player.weapon, 'div', '', pClass)}${hit(last.toPlayer, last.postureToPlayer, last.pBroke)}</div>
       <div class="mid"><div class="vs">ROUND ${last.round}</div><div class="result">${last.text}</div></div>
-      <div class="slot enemy"><div class="who">Enemy</div>${cardFace(last.ai, state.ai.weapon, 'div', '', aClass)}${hit(last.toAi)}</div>`;
+      <div class="slot enemy"><div class="who">Enemy</div>${cardFace(last.ai, state.ai.weapon, 'div', '', aClass)}${hit(last.toAi, last.postureToAi, last.aBroke)}</div>`;
     el.classList.remove('fresh');
     void el.offsetWidth; // restart the deal animation
     el.classList.add('fresh');
@@ -180,6 +196,11 @@
     $('aHp').textContent = `${Math.max(0, ai.hp)} / ${START_HP}`;
     $('pBar').style.width = `${Math.max(0, p.hp) / START_HP * 100}%`;
     $('aBar').style.width = `${Math.max(0, ai.hp) / START_HP * 100}%`;
+    for (const [key, f] of [['p', p], ['a', ai]]) {
+      $(`${key}Pos`).style.width = `${f.posture / POSTURE_MAX * 100}%`;
+      $(`${key}PosBar`).classList.toggle('danger', f.posture >= POSTURE_MAX - 2);
+      $(`${key}PosN`).textContent = `${f.posture} / ${POSTURE_MAX}`;
+    }
     $('pMeta').textContent = `${styleSummary(p.style)} | ${weaponSummary(p.weapon)} | Deck: ${p.deck.length}`;
     $('aMeta').textContent = `${styleSummary(ai.style)} | ${weaponSummary(ai.weapon)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}`;
     $('aHand').innerHTML = ai.hand.map(() => '<div class="back"></div>').join('');

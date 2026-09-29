@@ -64,3 +64,43 @@ test('weapons modify family damage but not specials', () => {
   const g = resolve('sparrow', 'gate', 'knives', 'sword');
   assert.deepEqual([g.toA, g.toB], [0, 3]); // 3 + 1 knives - 1 gate
 });
+
+test('posture damage goes to the loser, both on a trade, none from a Blade', () => {
+  const w = resolve('willow', 'hawk');
+  assert.deepEqual([w.postureToA, w.postureToB], [0, 3]);
+  const t = resolve('hawk', 'hawk');
+  assert.deepEqual([t.postureToA, t.postureToB], [4, 4]);
+  const b = resolve('blade', 'hawk');
+  assert.deepEqual([b.postureToA, b.postureToB], [0, 0]);
+});
+
+// A game where both hands are set so the next round is known.
+function rigged(playerCard, aiCard) {
+  const s = newGame({}, {});
+  s.player.hand[0] = playerCard;
+  s.ai.hand[0] = aiCard;
+  return s;
+}
+
+test('a full posture bar breaks the guard for a deathblow', () => {
+  const { POSTURE_MAX, DEATHBLOW } = require('../game.js');
+  const s = rigged('hawk', 'sparrow');
+  s.ai.posture = POSTURE_MAX - 1;
+  playRound(s, 0, 0);
+  assert.equal(s.last.aBroke, true);
+  assert.equal(s.ai.hp, 20 - 4 - DEATHBLOW);
+  assert.equal(s.ai.posture, 0);
+  assert.equal(s.last.toAi, 4 + DEATHBLOW);
+});
+
+test('posture recovers only when untouched, and not below half HP', () => {
+  const s = rigged('hawk', 'sparrow');
+  s.player.posture = 3;
+  playRound(s, 0, 0);
+  assert.equal(s.player.posture, 2);
+  const low = rigged('hawk', 'sparrow');
+  low.player.posture = 3;
+  low.player.hp = 9;
+  playRound(low, 0, 0);
+  assert.equal(low.player.posture, 3);
+});

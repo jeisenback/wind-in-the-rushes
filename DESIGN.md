@@ -24,16 +24,27 @@ Ties: Strike vs Strike trades (both deal damage). Guard vs Guard and Flow vs Flo
 
 ## Cards
 
-| Card | Family | Dmg | Effect |
-|---|---|---|---|
-| Falling Hawk | Strike | 4 | A heavy blow |
-| Quick Needle | Strike | 2 | Wins Strike ties instead of trading |
-| Iron Gate | Guard | 2 | Take 1 less damage if this loses |
-| Willow Bends | Guard | 3 | Counterattack. Nothing on a tie |
-| Mist on the Pond | Flow | 2 | Wins Flow ties |
-| Sparrow Turns | Flow | 3 | A reliable feint |
-| Crane in Still Water | Special | 7 | Beats any Strike. Loses to everything else |
-| Broken Blade | Special | 8 | Take the enemy hit plus 4, then deal 8 |
+| Card | Family | Dmg | Posture | Effect |
+|---|---|---|---|---|
+| Falling Hawk | Strike | 4 | 4 | A heavy blow that staggers |
+| Quick Needle | Strike | 2 | 2 | Wins Strike ties instead of trading |
+| Iron Gate | Guard | 2 | 2 | Take 1 less damage if this loses |
+| Willow Bends | Guard | 3 | 3 | A deflect and counter |
+| Mist on the Pond | Flow | 2 | 2 | Wins Flow ties |
+| Sparrow Turns | Flow | 3 | 2 | A reliable feint |
+| Crane in Still Water | Special | 7 | 5 | Beats any Strike, crushing posture. Loses to everything else |
+| Broken Blade | Special | 8 | 0 | Take the enemy hit plus 4, then deal 8 |
+
+## Posture
+
+Borrowed from Sekiro. Each fighter has a posture bar of 8.
+
+- Losing a clash adds the winning card's posture value to your bar. A Strike trade fills both bars. Broken Blade deals no posture.
+- A round where you take no posture recovers 1, but not while you are below half HP.
+- A full bar breaks your guard: you take a 5-damage deathblow and the bar resets to 0.
+
+In simulation, guards break in about 69% of games and about 41% of games end
+on a deathblow. Games run about 7 rounds.
 
 ## Fighting styles
 
@@ -48,8 +59,8 @@ styles are shown, so you know the enemy's card mix.
 | Stream (Flow-heavy) | 1 | 1 | 1 | 1 | 3 | 3 | 1 | 1 |
 
 The styles form their own triangle: Stone beats Storm, Storm beats Stream,
-Stream beats Stone (about 55-60% each, random play). Every style sits between
-47% and 52% overall.
+Stream beats Stone (random play). With posture, every style sits between 48%
+and 53% overall.
 
 ## Weapons
 
@@ -63,16 +74,16 @@ cards are never modified. You pick yours; the AI picks at random.
 | Staff | -1 | +2 | 0 |
 | Twin Knives | 0 | -1 | +1 |
 
-Each weapon averages 49-51% across all loadouts. Matching a weapon to your
-style pays off (Stone + Staff about 62%, Storm + Greatblade about 58%);
-mismatching costs (Storm + Staff about 40%).
+Each weapon averages about 50% across all loadouts. Matching a weapon to your
+style pays off and mismatching costs; with posture, loadouts range from about
+43% to 57%.
 
 ## Balance
 
 Average net damage of each card against a random card from the Balanced deck
-(first pass, from simulation): regular cards all sit between -0.6 and +0.6,
-Crane about +0.8, Broken Blade about +1.5. Games run about 8 rounds and
-almost always end on HP, not on empty hands.
+(first pass, before posture): regular cards all sit between -0.6 and +0.6,
+Crane about +0.8, Broken Blade about +1.5. Games almost always end on HP,
+not on empty hands.
 
 ## AI (v1)
 

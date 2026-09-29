@@ -3,19 +3,22 @@
 const HAND_SIZE = 4;
 const START_HP = 20;
 const BLADE_DAMAGE = 8;
+// Posture, after Sekiro: losing a clash fills your bar; a full bar breaks your guard.
+const POSTURE_MAX = 8;
+const DEATHBLOW = 5;
 
 // Which family each family beats. Special cards are handled separately.
 const BEATS = { strike: 'flow', flow: 'guard', guard: 'strike' };
 
 const CARDS = {
-  hawk:   { id: 'hawk',   name: 'Falling Hawk',         family: 'strike',  damage: 4, text: 'A heavy blow.' },
-  needle: { id: 'needle', name: 'Quick Needle',         family: 'strike',  damage: 2, winsTies: true, text: 'Wins Strike ties instead of trading.' },
-  gate:   { id: 'gate',   name: 'Iron Gate',            family: 'guard',   damage: 2, loseMod: -1, text: 'Take 1 less damage if this loses.' },
-  willow: { id: 'willow', name: 'Willow Bends',         family: 'guard',   damage: 3, text: 'Counterattack. Nothing on a tie.' },
-  mist:   { id: 'mist',   name: 'Mist on the Pond',     family: 'flow',    damage: 2, winsTies: true, text: 'Wins Flow ties.' },
-  sparrow:{ id: 'sparrow',name: 'Sparrow Turns',        family: 'flow',    damage: 3, text: 'A reliable feint.' },
-  crane:  { id: 'crane',  name: 'Crane in Still Water', family: 'special', damage: 7, text: 'Beats any Strike. Loses to everything else.' },
-  blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, selfCost: 4, text: 'Take the enemy hit plus 4, then deal 8.' },
+  hawk:   { id: 'hawk',   name: 'Falling Hawk',         family: 'strike',  damage: 4, posture: 4, text: 'A heavy blow that staggers.' },
+  needle: { id: 'needle', name: 'Quick Needle',         family: 'strike',  damage: 2, posture: 2, winsTies: true, text: 'Wins Strike ties instead of trading.' },
+  gate:   { id: 'gate',   name: 'Iron Gate',            family: 'guard',   damage: 2, posture: 2, loseMod: -1, text: 'Take 1 less damage if this loses.' },
+  willow: { id: 'willow', name: 'Willow Bends',         family: 'guard',   damage: 3, posture: 3, text: 'A deflect and counter.' },
+  mist:   { id: 'mist',   name: 'Mist on the Pond',     family: 'flow',    damage: 2, posture: 2, winsTies: true, text: 'Wins Flow ties.' },
+  sparrow:{ id: 'sparrow',name: 'Sparrow Turns',        family: 'flow',    damage: 3, posture: 2, text: 'A reliable feint.' },
+  crane:  { id: 'crane',  name: 'Crane in Still Water', family: 'special', damage: 7, posture: 5, text: 'Beats any Strike, crushing posture. Loses to everything else.' },
+  blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, posture: 0, selfCost: 4, text: 'Take the enemy hit plus 4, then deal 8.' },
 };
 
 // A fighting style is a named deck list of 12 cards.
@@ -52,7 +55,7 @@ function shuffle(list, rng) {
 
 function newFighter({ style = 'balanced', weapon = 'sword' } = {}, rng) {
   const deck = shuffle(STYLES[style].deck, rng);
-  return { style, weapon, hp: START_HP, hand: deck.splice(0, HAND_SIZE), deck, discard: [] };
+  return { style, weapon, hp: START_HP, posture: 0, hand: deck.splice(0, HAND_SIZE), deck, discard: [] };
 }
 
 // `player` and `ai` are { style, weapon } choices.
@@ -72,7 +75,7 @@ function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
   const b = CARDS[bId];
   const da = cardDamage(aId, aWeapon);
   const db = cardDamage(bId, bWeapon);
-  const r = { toA: 0, toB: 0, text: '' };
+  const r = { toA: 0, toB: 0, postureToA: 0, postureToB: 0, text: '' };
 
   if (a.id === 'blade' || b.id === 'blade') {
     // Each side takes the other card's hit; a Blade also costs its user.
@@ -98,12 +101,16 @@ function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
   if (winner === 'trade') {
     r.toA = db;
     r.toB = da;
+    r.postureToA = b.posture;
+    r.postureToB = a.posture;
     r.text = 'Both strikes land.';
   } else if (winner === 'a') {
     r.toB = Math.max(0, da + (b.loseMod || 0));
+    r.postureToB = a.posture;
     r.text = `${a.name} beats ${b.name}.`;
   } else if (winner === 'b') {
     r.toA = Math.max(0, db + (a.loseMod || 0));
+    r.postureToA = b.posture;
     r.text = `${b.name} beats ${a.name}.`;
   } else {
     r.text = 'The forms cancel out.';
@@ -130,6 +137,18 @@ function aiChoose(state, rng = Math.random) {
   return hand.length - 1;
 }
 
+// Adds posture damage, or recovers 1 if none was taken (none at all below half HP).
+// On a full bar the guard breaks: a deathblow lands and the bar resets.
+// Returns true if the guard broke.
+function applyPosture(f, taken) {
+  if (taken > 0) f.posture += taken;
+  else f.posture = Math.max(0, f.posture - (f.hp > START_HP / 2 ? 1 : 0));
+  if (f.posture < POSTURE_MAX) return false;
+  f.hp -= DEATHBLOW;
+  f.posture = 0;
+  return true;
+}
+
 function draw(f, n) {
   f.hand.push(...f.deck.splice(0, n));
 }
@@ -146,8 +165,16 @@ function playRound(state, playerIndex, aiIndex) {
   const r = resolve(pCard, aCard, p.weapon, ai.weapon);
   p.hp -= r.toA;
   ai.hp -= r.toB;
-  state.last = { round: state.round, player: pCard, ai: aCard, toPlayer: r.toA, toAi: r.toB, text: r.text };
-  state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.text} (You -${r.toA}, Enemy -${r.toB})`);
+  const pBroke = applyPosture(p, r.postureToA);
+  const aBroke = applyPosture(ai, r.postureToB);
+  const toPlayer = r.toA + (pBroke ? DEATHBLOW : 0);
+  const toAi = r.toB + (aBroke ? DEATHBLOW : 0);
+  state.last = {
+    round: state.round, player: pCard, ai: aCard, text: r.text,
+    toPlayer, toAi, postureToPlayer: r.postureToA, postureToAi: r.postureToB, pBroke, aBroke,
+  };
+  const breaks = (pBroke ? ' Your guard breaks: deathblow!' : '') + (aBroke ? ' The enemy guard breaks: deathblow!' : '');
+  state.log.push(`Round ${state.round}: You play ${CARDS[pCard].name}, the enemy plays ${CARDS[aCard].name}. ${r.text}${breaks} (You -${toPlayer}, Enemy -${toAi})`);
 
   draw(p, HAND_SIZE - p.hand.length);
   draw(ai, HAND_SIZE - ai.hand.length);
@@ -162,5 +189,5 @@ function playRound(state, playerIndex, aiIndex) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CARDS, STYLES, WEAPONS, HAND_SIZE, START_HP, cardDamage, resolve, newGame, aiChoose, playRound };
+  module.exports = { CARDS, STYLES, WEAPONS, HAND_SIZE, START_HP, POSTURE_MAX, DEATHBLOW, cardDamage, resolve, newGame, aiChoose, playRound };
 }
