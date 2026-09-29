@@ -33,7 +33,7 @@ Ties: Strike vs Strike trades (both deal damage). Guard vs Guard and Flow vs Flo
 | Mist on the Pond | Flow | 2 | 2 | Wins Flow ties |
 | Sparrow Turns | Flow | 4 | 2 | A feint that cuts deep |
 | Crane in Still Water | Special | 7 | 5 | Beats any Strike, crushing posture. Loses to everything else |
-| Broken Blade | Special | 8 | 0 | Only at 10 HP or less. Take the enemy hit plus 4, then deal 8 |
+| Broken Blade | Special | 8 | 0 | Held in reserve; joins your hand at 10 HP or less. Take the enemy hit plus 4, then deal 8 |
 
 ## Posture
 
@@ -49,11 +49,11 @@ At 10 HP or less (half of starting HP) you are desperate, which gives you two
 tools:
 
 - **Clarity:** each round, one random card in the enemy hand is revealed to
-  you. The AI gets the same when it is desperate, and plays the best counter
-  to the card it sees (never Broken Blade, which ignores what it meets). Your
-  card the enemy can see is marked.
-- **Broken Blade** unlocks. It is also playable if it is the last card in
-  your hand.
+  you. The AI gets the same when it is desperate. Your card the enemy can see
+  is marked.
+- **Broken Blade** joins your hand. It starts in reserve, outside the deck,
+  so it never sits in your hand as a card you cannot play. Whether a fighter's
+  Blade is still in reserve is public.
 
 An information boost was chosen over a damage boost (Tekken-style rage).
 In simulation, +1 or +2 damage when desperate lifted comebacks only to 13-15%,
@@ -111,10 +111,29 @@ Average net damage of each card against a random card from the Balanced deck
 Crane about +0.8, Broken Blade about +1.5. Games almost always end on HP,
 not on empty hands.
 
-## AI (v1)
+## AI
 
-Random card from hand, weighted 3:1 toward cards that beat the family you played last.
+The AI predicts the player's next card from public information only: the
+player's style (so their full card list), their discards, their hand size,
+whether their Broken Blade is still in reserve, and any card Clarity reveals.
+It never looks at the player's hand.
+
+It scores each card in its own hand by expected value against that prediction:
+HP difference, posture difference at half weight, guard breaks (5), and lethal
+blows (20). It then picks with a softmax (temperature 1) rather than always
+taking the top score, so it stays hard to read.
+
+Head to head over 2,000 games with random loadouts, it beats the previous AI
+(weighted toward beating your last family) about 58% of the time, and random
+play about 64%. The temperature and posture weight barely changed that.
+
+With both sides using this AI (1,000 games): Guard beats Strike becomes the
+most common result, Falling Hawk drops to the weakest card (about -0.7 HP per
+play) and Storm to the weakest style (41-43%). About 9% of games now end on
+empty hands, since the deck is 11 cards with Broken Blade in reserve. The
+fighter who drops to half HP first comes back about 12% of the time.
 
 ## Later, not now
 
-- AI that reads your discard pile
+- Retune Falling Hawk and Storm against the smarter AI
+- An AI that learns a player's habits across games

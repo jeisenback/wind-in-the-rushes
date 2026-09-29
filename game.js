@@ -6,6 +6,8 @@ const BLADE_DAMAGE = 8;
 // Posture, after Sekiro: losing a clash fills your bar; a full bar breaks your guard.
 const POSTURE_MAX = 8;
 const DEATHBLOW = 5;
+// How loosely the AI picks among its options; see aiChoose.
+const AI_TEMPERATURE = 1;
 
 // Which family each family beats. Special cards are handled separately.
 const BEATS = { strike: 'flow', flow: 'guard', guard: 'strike' };
@@ -18,7 +20,7 @@ const CARDS = {
   mist:   { id: 'mist',   name: 'Mist on the Pond',     family: 'flow',    damage: 2, posture: 2, winsTies: true, text: 'Wins Flow ties.' },
   sparrow:{ id: 'sparrow',name: 'Sparrow Turns',        family: 'flow',    damage: 4, posture: 2, text: 'A feint that cuts deep.' },
   crane:  { id: 'crane',  name: 'Crane in Still Water', family: 'special', damage: 7, posture: 5, text: 'Beats any Strike, crushing posture. Loses to everything else.' },
-  blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, posture: 0, selfCost: 4, desperate: true, text: 'Only at 10 HP or less. Take the enemy hit plus 4, then deal 8.' },
+  blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, posture: 0, selfCost: 4, reserve: true, text: 'Joins your hand at 10 HP or less. Take the enemy hit plus 4, then deal 8.' },
 };
 
 // A fighting style is a named deck list of 12 cards.
@@ -53,9 +55,12 @@ function shuffle(list, rng) {
   return a;
 }
 
+// Reserve cards (Broken Blade) stay out of the deck until the fighter is desperate.
 function newFighter({ style = 'balanced', weapon = 'sword' } = {}, rng) {
-  const deck = shuffle(STYLES[style].deck, rng);
-  return { style, weapon, hp: START_HP, posture: 0, hand: deck.splice(0, HAND_SIZE), deck, discard: [] };
+  const cards = STYLES[style].deck;
+  const deck = shuffle(cards.filter((id) => !CARDS[id].reserve), rng);
+  const reserve = cards.filter((id) => CARDS[id].reserve);
+  return { style, weapon, hp: START_HP, posture: 0, hand: deck.splice(0, HAND_SIZE), deck, reserve, discard: [] };
 }
 
 // `player` and `ai` are { style, weapon } choices.
@@ -159,14 +164,17 @@ function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
   return r;
 }
 
-// Badly hurt: at half HP or less. Grants Clarity and unlocks desperate cards.
+// Badly hurt: at half HP or less. Grants Clarity and brings in reserve cards.
 function isDesperate(f) {
   return f.hp <= START_HP / 2;
 }
 
-// A desperate card needs its fighter at half HP or less, unless it is the only card left.
-function canPlay(f, index) {
-  return !CARDS[f.hand[index]].desperate || isDesperate(f) || f.hand.length === 1;
+// Moves reserve cards into the hand once the fighter is desperate.
+// Returns true if any joined this call.
+function joinReserve(f) {
+  if (!isDesperate(f) || !f.reserve.length) return false;
+  f.hand.push(...f.reserve.splice(0));
+  return true;
 }
 
 // Clarity: each round, a desperate fighter sees one random card in the enemy hand.
@@ -176,38 +184,63 @@ function rollClarity(state, rng) {
   state.clarity = { player: pick(state.player, state.ai), ai: pick(state.ai, state.player) };
 }
 
-// AI: with Clarity, play the card that does best against the revealed card, if any
-// card comes out ahead. Otherwise pick at random, weighted toward cards that beat
-// the player's last family.
-function aiChoose(state, rng = Math.random) {
-  const hand = state.ai.hand;
+// What the AI thinks the player will play next, as { cardId: probability }.
+// Uses only public information: the player's style (so their full card list),
+// their discards, their hand size, whether their reserve has joined, and any
+// card Clarity reveals. It never looks at the player's hand itself.
+function predictPlay(state) {
+  const opp = state.player;
+  const handSize = opp.hand.length;
+  const known = [];
   const seenIdx = state.clarity && state.clarity.ai;
-  if (seenIdx != null) {
-    const seen = state.player.hand[seenIdx];
-    let best = -1, bestNet = 0;
-    hand.forEach((id, i) => {
-      // Broken Blade does the same thing whatever it meets, so it is no answer to what Clarity shows.
-      if (!canPlay(state.ai, i) || id === 'blade') return;
-      const r = resolve(id, seen, state.ai.weapon, state.player.weapon);
-      if (r.toB - r.toA > bestNet) { best = i; bestNet = r.toB - r.toA; }
-    });
-    if (best >= 0) return best;
+  if (seenIdx != null) known.push(opp.hand[seenIdx]);
+  const pool = {};
+  for (const id of STYLES[opp.style].deck) pool[id] = (pool[id] || 0) + 1;
+  for (const id of opp.discard) pool[id]--;
+  for (const id of STYLES[opp.style].deck.filter((c) => CARDS[c].reserve)) {
+    // A reserve card is certainly in hand once desperate (unless already played), otherwise nowhere.
+    if (pool[id] > 0 && isDesperate(opp) && !known.includes(id)) known.push(id);
+    pool[id] = 0;
   }
-  const last = state.player.discard[state.player.discard.length - 1];
-  const lastFamily = last && CARDS[last].family;
-  const weights = hand.map((id, i) => {
-    const card = CARDS[id];
-    if (!canPlay(state.ai, i)) return 0;
-    if (!lastFamily) return 1;
-    if (card.id === 'crane') return lastFamily === 'strike' ? 3 : 1;
-    return BEATS[card.family] === lastFamily ? 3 : 1;
-  });
-  let roll = rng() * weights.reduce((s, w) => s + w, 0);
-  for (let i = 0; i < hand.length; i++) {
+  for (const id of known) if (pool[id] > 0) pool[id]--;
+  const poolTotal = Object.values(pool).reduce((a, b) => a + b, 0);
+  const unknownShare = handSize ? (handSize - known.length) / handSize : 0;
+  const probs = {};
+  for (const id of known) probs[id] = (probs[id] || 0) + 1 / handSize;
+  for (const [id, n] of Object.entries(pool)) {
+    if (n > 0 && poolTotal > 0) probs[id] = (probs[id] || 0) + unknownShare * n / poolTotal;
+  }
+  return probs;
+}
+
+// How good one clash result is for the AI (side b of `r` is the player).
+// Counts HP, posture at half weight, guard breaks, and lethal blows.
+function outcomeValue(r, me, opp) {
+  let v = (r.toB - r.toA) + 0.5 * (r.postureToB - r.postureToA);
+  if (opp.posture + r.postureToB >= POSTURE_MAX) v += DEATHBLOW;
+  if (me.posture + r.postureToA >= POSTURE_MAX) v -= DEATHBLOW;
+  if (r.toB >= opp.hp) v += 20;
+  if (r.toA >= me.hp) v -= 20;
+  return v;
+}
+
+// AI: scores each card in hand by its expected value against the predicted
+// play, then picks among them with a softmax so it stays hard to read.
+// Lower `temperature` plays sharper and more predictably.
+function aiChoose(state, rng = Math.random, temperature = AI_TEMPERATURE) {
+  const me = state.ai;
+  const opp = state.player;
+  const probs = Object.entries(predictPlay(state));
+  const values = me.hand.map((id) => probs.reduce(
+    (sum, [theirs, p]) => sum + p * outcomeValue(resolve(id, theirs, me.weapon, opp.weapon), me, opp), 0));
+  const top = Math.max(...values);
+  const weights = values.map((v) => Math.exp((v - top) / temperature));
+  let roll = rng() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < weights.length; i++) {
     roll -= weights[i];
-    if (roll < 0 && weights[i] > 0) return i;
+    if (roll < 0) return i;
   }
-  return weights.findLastIndex((w) => w > 0);
+  return weights.length - 1;
 }
 
 // Adds posture damage, or recovers 1 if none was taken.
@@ -230,7 +263,6 @@ function draw(f, n) {
 function playRound(state, playerIndex, aiIndex, rng = Math.random) {
   const p = state.player;
   const ai = state.ai;
-  if (!canPlay(p, playerIndex) || !canPlay(ai, aiIndex)) throw new Error('That card cannot be played yet.');
   const pCard = p.hand.splice(playerIndex, 1)[0];
   const aCard = ai.hand.splice(aiIndex, 1)[0];
   p.discard.push(pCard);
@@ -254,6 +286,9 @@ function playRound(state, playerIndex, aiIndex, rng = Math.random) {
 
   draw(p, HAND_SIZE - p.hand.length);
   draw(ai, HAND_SIZE - ai.hand.length);
+  state.last.joined = { player: joinReserve(p), ai: joinReserve(ai) };
+  if (state.last.joined.player) state.log.push('Broken Blade joins your hand.');
+  if (state.last.joined.ai) state.log.push('Broken Blade joins the enemy hand.');
   state.round++;
   rollClarity(state, rng);
 
@@ -266,5 +301,5 @@ function playRound(state, playerIndex, aiIndex, rng = Math.random) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CARDS, STYLES, WEAPONS, HAND_SIZE, START_HP, POSTURE_MAX, DEATHBLOW, cardDamage, resolve, newGame, canPlay, aiChoose, playRound };
+  module.exports = { CARDS, STYLES, WEAPONS, HAND_SIZE, START_HP, POSTURE_MAX, DEATHBLOW, cardDamage, resolve, newGame, predictPlay, aiChoose, playRound };
 }

@@ -39,7 +39,6 @@
   button.card { cursor: pointer; }
   button.card:hover:not(:disabled), button.card:focus-visible { outline: 2px solid var(--fam); outline-offset: 2px; }
   button.card:disabled { opacity: .5; cursor: default; }
-  button.card.locked { border-style: dashed; }
   /* Clarity: the enemy card you see, and your card the enemy sees. */
   .back.revealed { background: var(--panel); border: 2px solid var(--fam); }
   .clarity .meta { margin-top: 0; }
@@ -91,7 +90,7 @@
   <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.<br>
     Losing a clash fills your posture. A full bar of 8 breaks your guard for a 5-damage deathblow.
     Posture recovers 1 each round you take none.<br>
-    At 10 HP or less you gain Clarity: each round one random enemy card is revealed, and Broken Blade unlocks.
+    At 10 HP or less you gain Clarity: each round one random enemy card is revealed, and Broken Blade joins your hand from reserve.
     The enemy gains the same when it is that low.</p>
   <div class="controls">
     <label for="style">Your style</label>
@@ -215,8 +214,9 @@
       $(`${key}PosBar`).classList.toggle('danger', f.posture >= POSTURE_MAX - 2);
       $(`${key}PosN`).textContent = `${f.posture} / ${POSTURE_MAX}`;
     }
-    $('pMeta').textContent = `${styleSummary(p.style)} | ${weaponSummary(p.weapon)} | Deck: ${p.deck.length}`;
-    $('aMeta').textContent = `${styleSummary(ai.style)} | ${weaponSummary(ai.weapon)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}`;
+    const reserve = (f) => (f.reserve.length ? ' | Broken Blade in reserve' : '');
+    $('pMeta').textContent = `${styleSummary(p.style)} | ${weaponSummary(p.weapon)} | Deck: ${p.deck.length}${reserve(p)}`;
+    $('aMeta').textContent = `${styleSummary(ai.style)} | ${weaponSummary(ai.weapon)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}${reserve(ai)}`;
     const seen = state.over ? null : state.clarity.player;
     $('aHand').innerHTML = ai.hand
       .map((id, i) => (i === seen ? `<div class="back revealed ${CARDS[id].family}"></div>` : '<div class="back"></div>'))
@@ -231,17 +231,17 @@
     $('aPile').innerHTML = ai.discard.map(chip).join('');
     $('pHand').innerHTML = p.hand
       .map((id, i) => {
-        const locked = !canPlay(p, i);
-        const attrs = `data-i="${i}" ${state.over || locked ? 'disabled' : ''} ${locked ? 'title="Unlocks at 10 HP or less"' : ''}`;
-        const classes = [locked ? 'locked' : '', !state.over && state.clarity.ai === i ? 'seen' : ''].join(' ');
-        return cardFace(id, p.weapon, 'button', attrs, classes);
+        const attrs = `data-i="${i}" ${state.over ? 'disabled' : ''}`;
+        return cardFace(id, p.weapon, 'button', attrs, !state.over && state.clarity.ai === i ? 'seen' : '');
       })
       .join('');
     renderClash();
     $('log').innerHTML = state.log.slice().reverse().map((l) => `<li>${l}</li>`).join('');
     $('banner').textContent = state.over
       ? { player: 'Victory.', ai: 'Defeat.', draw: 'A draw.' }[state.winner]
-      : `Round ${state.round}: choose a form.`;
+      : `Round ${state.round}: choose a form.`
+        + (state.last?.joined?.player ? ' Broken Blade joins your hand.' : '')
+        + (state.last?.joined?.ai ? ' Broken Blade joins the enemy hand.' : '');
   }
 
   $('pHand').addEventListener('click', (e) => {

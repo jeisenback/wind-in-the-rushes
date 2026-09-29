@@ -1,9 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { resolve, newGame, playRound, aiChoose, canPlay } = require('../game.js');
-
-// The first card in hand that may legally be played.
-const firstPlayable = (f) => f.hand.findIndex((_, i) => canPlay(f, i));
+const { resolve, newGame, playRound, aiChoose, predictPlay } = require('../game.js');
 
 const dmg = (a, b) => { const r = resolve(a, b); return [r.toA, r.toB]; };
 
@@ -42,7 +39,7 @@ test('broken blade costs its user', () => {
 test('full games end with a winner', () => {
   for (let i = 0; i < 200; i++) {
     const s = newGame({ style: 'storm', weapon: 'greatblade' }, { style: 'stone', weapon: 'knives' });
-    while (!s.over) playRound(s, firstPlayable(s.player), aiChoose(s));
+    while (!s.over) playRound(s, 0, aiChoose(s));
     assert.ok(['player', 'ai', 'draw'].includes(s.winner));
     assert.ok(s.round <= 13);
   }
@@ -120,24 +117,18 @@ test('results name the deciding rule and the damage parts', () => {
   assert.deepEqual(resolve('blade', 'crane').partsA, ['Crane in Still Water misses', 'Broken Blade cost 4']);
 });
 
-test('Broken Blade needs 10 HP or less, unless it is the last card', () => {
-  const s = rigged('blade', 'hawk');
-  assert.equal(canPlay(s.player, 0), false);
-  assert.throws(() => playRound(s, 0, 0));
-  s.player.hp = 10;
-  assert.equal(canPlay(s.player, 0), true);
-  const last = rigged('blade', 'hawk');
-  last.player.hand = ['blade'];
-  assert.equal(canPlay(last.player, 0), true);
-});
-
-test('the AI never picks a Broken Blade it cannot play', () => {
-  const s = newGame({}, {});
-  s.ai.hand = ['blade', 'gate', 'gate', 'gate'];
-  for (let i = 0; i < 200; i++) assert.notEqual(aiChoose(s), 0);
-  s.ai.hp = 10;
-  const picks = new Set(Array.from({ length: 200 }, () => aiChoose(s)));
-  assert.ok(picks.has(0));
+test('Broken Blade waits in reserve and joins the hand at 10 HP or less', () => {
+  const s = rigged('gate', 'sparrow');
+  assert.deepEqual(s.player.reserve, ['blade']);
+  assert.ok(!s.player.hand.includes('blade') && !s.player.deck.includes('blade'));
+  assert.equal(s.player.hand.length + s.player.deck.length, 11);
+  s.player.hp = 13; // Sparrow Turns deals 4, Iron Gate softens it to 3: down to 10
+  playRound(s, 0, 0);
+  assert.equal(s.player.hp, 10);
+  assert.ok(s.player.hand.includes('blade'));
+  assert.deepEqual(s.player.reserve, []);
+  assert.equal(s.last.joined.player, true);
+  assert.ok(s.log.includes('Broken Blade joins your hand.'));
 });
 
 test('Clarity reveals an enemy card only to a desperate fighter', () => {
@@ -150,20 +141,30 @@ test('Clarity reveals an enemy card only to a desperate fighter', () => {
   assert.equal(s.clarity.ai, null);
 });
 
-test('the AI counters a card it sees through Clarity', () => {
-  const s = newGame({}, {});
-  s.player.hand = ['hawk', 'sparrow', 'mist', 'gate'];
-  s.ai.hand = ['sparrow', 'willow', 'mist', 'needle'];
-  s.ai.hp = 10;
-  s.clarity = { player: null, ai: 0 }; // the AI sees Falling Hawk
-  for (let i = 0; i < 50; i++) assert.equal(aiChoose(s), 1); // Willow Bends
+test('the AI predicts from public information only', () => {
+  const a = newGame({ style: 'stone' }, {});
+  const b = newGame({ style: 'stone' }, {});
+  a.player.hand = ['gate', 'gate', 'gate', 'willow'];
+  b.player.hand = ['hawk', 'needle', 'mist', 'crane'];
+  const pa = predictPlay(a);
+  assert.deepEqual(pa, predictPlay(b));
+  const total = Object.values(pa).reduce((x, y) => x + y, 0);
+  assert.ok(Math.abs(total - 1) < 1e-9);
+  assert.equal(pa.blade, undefined); // still in reserve
 });
 
-test('Clarity counters use a real counter, not Broken Blade', () => {
+test('the AI answers a card it sees through Clarity', () => {
   const s = newGame({}, {});
-  s.player.hand = ['gate', 'hawk', 'hawk', 'hawk'];
+  s.player.hand = ['hawk'];
+  s.ai.hand = ['sparrow', 'willow', 'mist', 'needle'];
+  s.clarity = { player: null, ai: 0 }; // the AI sees Falling Hawk, the only card left
+  for (let i = 0; i < 20; i++) assert.equal(aiChoose(s, Math.random, 0.01), 1); // Willow Bends
+});
+
+test('the AI prefers a real counter to Broken Blade against a known card', () => {
+  const s = newGame({}, {});
+  s.player.hand = ['gate'];
   s.ai.hand = ['blade', 'sparrow', 'gate', 'gate'];
-  s.ai.hp = 10;
   s.clarity = { player: null, ai: 0 }; // the AI sees Iron Gate
-  for (let i = 0; i < 50; i++) assert.equal(aiChoose(s), 1); // Sparrow Turns
+  for (let i = 0; i < 20; i++) assert.equal(aiChoose(s, Math.random, 0.01), 1); // Sparrow Turns
 });
