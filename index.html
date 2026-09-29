@@ -37,8 +37,9 @@
   .card { width: 150px; min-height: 120px; text-align: left; padding: 10px; border-radius: 8px;
           border: 2px solid var(--fam); background: var(--panel); color: var(--ink); font: inherit; }
   button.card { cursor: pointer; }
-  button.card:hover:not(:disabled) { transform: translateY(-2px); }
+  button.card:hover:not(:disabled), button.card:focus-visible { outline: 2px solid var(--fam); outline-offset: 2px; }
   button.card:disabled { opacity: .5; cursor: default; }
+  button.card.locked { border-style: dashed; }
   .card .fam { color: var(--fam); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
   .card .stats { font-size: .75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
   .card .name { font-weight: 700; margin: 2px 0; }
@@ -83,7 +84,7 @@
   <h1>Wind in the Rushes</h1>
   <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.<br>
     Losing a clash fills your posture. A full bar of 8 breaks your guard for a 5-damage deathblow.
-    Posture recovers 1 each round you take none, but not below half HP.</p>
+    Posture recovers 1 each round you take none, but not at 10 HP or less.</p>
   <div class="controls">
     <label for="style">Your style</label>
     <select id="style"></select>
@@ -211,7 +212,11 @@
     $('pPile').innerHTML = p.discard.map(chip).join('');
     $('aPile').innerHTML = ai.discard.map(chip).join('');
     $('pHand').innerHTML = p.hand
-      .map((id, i) => cardFace(id, p.weapon, 'button', `data-i="${i}" ${state.over ? 'disabled' : ''}`))
+      .map((id, i) => {
+        const locked = !canPlay(p, i);
+        const attrs = `data-i="${i}" ${state.over || locked ? 'disabled' : ''} ${locked ? 'title="Unlocks at 10 HP or less"' : ''}`;
+        return cardFace(id, p.weapon, 'button', attrs, locked ? 'locked' : '');
+      })
       .join('');
     renderClash();
     $('log').innerHTML = state.log.slice().reverse().map((l) => `<li>${l}</li>`).join('');

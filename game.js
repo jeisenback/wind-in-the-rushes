@@ -18,7 +18,7 @@ const CARDS = {
   mist:   { id: 'mist',   name: 'Mist on the Pond',     family: 'flow',    damage: 2, posture: 2, winsTies: true, text: 'Wins Flow ties.' },
   sparrow:{ id: 'sparrow',name: 'Sparrow Turns',        family: 'flow',    damage: 3, posture: 2, text: 'A reliable feint.' },
   crane:  { id: 'crane',  name: 'Crane in Still Water', family: 'special', damage: 7, posture: 5, text: 'Beats any Strike, crushing posture. Loses to everything else.' },
-  blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, posture: 0, selfCost: 4, text: 'Take the enemy hit plus 4, then deal 8.' },
+  blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, posture: 0, selfCost: 4, desperate: true, text: 'Only at 10 HP or less. Take the enemy hit plus 4, then deal 8.' },
 };
 
 // A fighting style is a named deck list of 12 cards.
@@ -160,12 +160,23 @@ function resolve(aId, bId, aWeapon = 'sword', bWeapon = 'sword') {
 }
 
 // v1 AI: random pick, weighted toward cards that beat the player's last family.
+// Badly hurt: at half HP or less. Posture stops recovering, and desperate cards unlock.
+function isDesperate(f) {
+  return f.hp <= START_HP / 2;
+}
+
+// A desperate card needs its fighter at half HP or less, unless it is the only card left.
+function canPlay(f, index) {
+  return !CARDS[f.hand[index]].desperate || isDesperate(f) || f.hand.length === 1;
+}
+
 function aiChoose(state, rng = Math.random) {
   const hand = state.ai.hand;
   const last = state.player.discard[state.player.discard.length - 1];
   const lastFamily = last && CARDS[last].family;
-  const weights = hand.map((id) => {
+  const weights = hand.map((id, i) => {
     const card = CARDS[id];
+    if (!canPlay(state.ai, i)) return 0;
     if (!lastFamily) return 1;
     if (card.id === 'crane') return lastFamily === 'strike' ? 3 : 1;
     return BEATS[card.family] === lastFamily ? 3 : 1;
@@ -173,9 +184,9 @@ function aiChoose(state, rng = Math.random) {
   let roll = rng() * weights.reduce((s, w) => s + w, 0);
   for (let i = 0; i < hand.length; i++) {
     roll -= weights[i];
-    if (roll < 0) return i;
+    if (roll < 0 && weights[i] > 0) return i;
   }
-  return hand.length - 1;
+  return weights.findLastIndex((w) => w > 0);
 }
 
 // Adds posture damage, or recovers 1 if none was taken (none at all below half HP).
@@ -183,7 +194,7 @@ function aiChoose(state, rng = Math.random) {
 // Returns true if the guard broke.
 function applyPosture(f, taken) {
   if (taken > 0) f.posture += taken;
-  else f.posture = Math.max(0, f.posture - (f.hp > START_HP / 2 ? 1 : 0));
+  else f.posture = Math.max(0, f.posture - (isDesperate(f) ? 0 : 1));
   if (f.posture < POSTURE_MAX) return false;
   f.hp -= DEATHBLOW;
   f.posture = 0;
@@ -198,6 +209,7 @@ function draw(f, n) {
 function playRound(state, playerIndex, aiIndex) {
   const p = state.player;
   const ai = state.ai;
+  if (!canPlay(p, playerIndex) || !canPlay(ai, aiIndex)) throw new Error('That card cannot be played yet.');
   const pCard = p.hand.splice(playerIndex, 1)[0];
   const aCard = ai.hand.splice(aiIndex, 1)[0];
   p.discard.push(pCard);
@@ -232,5 +244,5 @@ function playRound(state, playerIndex, aiIndex) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CARDS, STYLES, WEAPONS, HAND_SIZE, START_HP, POSTURE_MAX, DEATHBLOW, cardDamage, resolve, newGame, aiChoose, playRound };
+  module.exports = { CARDS, STYLES, WEAPONS, HAND_SIZE, START_HP, POSTURE_MAX, DEATHBLOW, cardDamage, resolve, newGame, canPlay, aiChoose, playRound };
 }

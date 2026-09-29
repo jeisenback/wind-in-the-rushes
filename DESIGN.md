@@ -33,18 +33,28 @@ Ties: Strike vs Strike trades (both deal damage). Guard vs Guard and Flow vs Flo
 | Mist on the Pond | Flow | 2 | 2 | Wins Flow ties |
 | Sparrow Turns | Flow | 3 | 2 | A reliable feint |
 | Crane in Still Water | Special | 7 | 5 | Beats any Strike, crushing posture. Loses to everything else |
-| Broken Blade | Special | 8 | 0 | Take the enemy hit plus 4, then deal 8 |
+| Broken Blade | Special | 8 | 0 | Only at 10 HP or less. Take the enemy hit plus 4, then deal 8 |
 
 ## Posture
 
 Borrowed from Sekiro. Each fighter has a posture bar of 8.
 
 - Losing a clash adds the winning card's posture value to your bar. A Strike trade fills both bars. Broken Blade deals no posture.
-- A round where you take no posture recovers 1, but not while you are below half HP.
+- A round where you take no posture recovers 1, but not at 10 HP or less.
 - A full bar breaks your guard: you take a 5-damage deathblow and the bar resets to 0.
 
-In simulation, guards break in about 69% of games and about 41% of games end
-on a deathblow. Games run about 7 rounds.
+## Desperation
+
+At 10 HP or less (half of starting HP) you are desperate: posture stops
+recovering, and Broken Blade unlocks. Broken Blade is also playable if it is
+the last card in your hand.
+
+## Simulation (1,000 AI-vs-AI games, random loadouts)
+
+After locking Broken Blade behind desperation: games run about 8.5 rounds,
+90% have at least one guard break, and 15% end on a deathblow. Broken Blade
+decides 9% of rounds, down from 16%. Sparrow Turns is the weakest card
+(about -0.6 HP per play) and Storm + Staff the weakest loadout (about 34%).
 
 ## Fighting styles
 

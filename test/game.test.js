@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { resolve, newGame, playRound, aiChoose } = require('../game.js');
+const { resolve, newGame, playRound, aiChoose, canPlay } = require('../game.js');
+
+// The first card in hand that may legally be played.
+const firstPlayable = (f) => f.hand.findIndex((_, i) => canPlay(f, i));
 
 const dmg = (a, b) => { const r = resolve(a, b); return [r.toA, r.toB]; };
 
@@ -39,7 +42,7 @@ test('broken blade costs its user', () => {
 test('full games end with a winner', () => {
   for (let i = 0; i < 200; i++) {
     const s = newGame({ style: 'storm', weapon: 'greatblade' }, { style: 'stone', weapon: 'knives' });
-    while (!s.over) playRound(s, 0, aiChoose(s));
+    while (!s.over) playRound(s, firstPlayable(s.player), aiChoose(s));
     assert.ok(['player', 'ai', 'draw'].includes(s.winner));
     assert.ok(s.round <= 13);
   }
@@ -115,4 +118,24 @@ test('results name the deciding rule and the damage parts', () => {
   assert.equal(resolve('hawk', 'hawk').rule, 'Strike tie: both land');
   assert.equal(resolve('willow', 'gate').rule, 'Guard tie: nothing happens');
   assert.deepEqual(resolve('blade', 'crane').partsA, ['Crane in Still Water misses', 'Broken Blade cost 4']);
+});
+
+test('Broken Blade needs 10 HP or less, unless it is the last card', () => {
+  const s = rigged('blade', 'hawk');
+  assert.equal(canPlay(s.player, 0), false);
+  assert.throws(() => playRound(s, 0, 0));
+  s.player.hp = 10;
+  assert.equal(canPlay(s.player, 0), true);
+  const last = rigged('blade', 'hawk');
+  last.player.hand = ['blade'];
+  assert.equal(canPlay(last.player, 0), true);
+});
+
+test('the AI never picks a Broken Blade it cannot play', () => {
+  const s = newGame({}, {});
+  s.ai.hand = ['blade', 'gate', 'gate', 'gate'];
+  for (let i = 0; i < 200; i++) assert.notEqual(aiChoose(s), 0);
+  s.ai.hp = 10;
+  const picks = new Set(Array.from({ length: 200 }, () => aiChoose(s)));
+  assert.ok(picks.has(0));
 });
