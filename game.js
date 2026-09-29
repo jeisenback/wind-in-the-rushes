@@ -18,12 +18,13 @@ const CARDS = {
   blade:  { id: 'blade',  name: 'Broken Blade',         family: 'special', damage: BLADE_DAMAGE, selfCost: 4, text: 'Take the enemy hit plus 4, then deal 8.' },
 };
 
-const STARTER_DECK = [
-  'hawk', 'hawk', 'needle', 'needle',
-  'gate', 'gate', 'willow',
-  'mist', 'mist', 'sparrow',
-  'crane', 'blade',
-];
+// A fighting style is a named deck list of 12 cards.
+const STYLES = {
+  balanced: { name: 'Balanced', deck: ['hawk', 'hawk', 'needle', 'needle', 'gate', 'gate', 'willow', 'mist', 'mist', 'sparrow', 'crane', 'blade'] },
+  storm:    { name: 'Storm',    deck: ['hawk', 'hawk', 'hawk', 'needle', 'needle', 'needle', 'gate', 'willow', 'mist', 'sparrow', 'sparrow', 'blade'] },
+  stone:    { name: 'Stone',    deck: ['hawk', 'needle', 'gate', 'gate', 'gate', 'willow', 'willow', 'mist', 'sparrow', 'sparrow', 'crane', 'blade'] },
+  stream:   { name: 'Stream',   deck: ['hawk', 'needle', 'gate', 'willow', 'mist', 'mist', 'mist', 'sparrow', 'sparrow', 'sparrow', 'crane', 'blade'] },
+};
 
 function shuffle(list, rng) {
   const a = list.slice();
@@ -34,13 +35,13 @@ function shuffle(list, rng) {
   return a;
 }
 
-function newFighter(rng) {
-  const deck = shuffle(STARTER_DECK, rng);
-  return { hp: START_HP, hand: deck.splice(0, HAND_SIZE), deck, discard: [] };
+function newFighter(styleId, rng) {
+  const deck = shuffle(STYLES[styleId].deck, rng);
+  return { style: styleId, hp: START_HP, hand: deck.splice(0, HAND_SIZE), deck, discard: [] };
 }
 
-function newGame(rng = Math.random) {
-  return { player: newFighter(rng), ai: newFighter(rng), round: 1, log: [], over: false, winner: null };
+function newGame(playerStyle = 'balanced', aiStyle = 'balanced', rng = Math.random) {
+  return { player: newFighter(playerStyle, rng), ai: newFighter(aiStyle, rng), round: 1, log: [], over: false, winner: null };
 }
 
 // Damage a card inflicts on a Broken Blade user, who takes the hit unopposed.
@@ -142,5 +143,5 @@ function playRound(state, playerIndex, aiIndex) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CARDS, STARTER_DECK, HAND_SIZE, START_HP, resolve, newGame, aiChoose, playRound };
+  module.exports = { CARDS, STYLES, HAND_SIZE, START_HP, resolve, newGame, aiChoose, playRound };
 }

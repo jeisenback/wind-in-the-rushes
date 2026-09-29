@@ -38,9 +38,17 @@ test('broken blade costs its user', () => {
 
 test('full games end with a winner', () => {
   for (let i = 0; i < 200; i++) {
-    const s = newGame();
+    const s = newGame('storm', 'stone');
     while (!s.over) playRound(s, 0, aiChoose(s));
     assert.ok(['player', 'ai', 'draw'].includes(s.winner));
     assert.ok(s.round <= 13);
+  }
+});
+
+test('every style has a 12-card deck of known cards', () => {
+  const { STYLES, CARDS } = require('../game.js');
+  for (const style of Object.values(STYLES)) {
+    assert.equal(style.deck.length, 12);
+    for (const id of style.deck) assert.ok(CARDS[id], id);
   }
 });

@@ -35,11 +35,25 @@ Ties: Strike vs Strike trades (both deal damage). Guard vs Guard and Flow vs Flo
 | Crane in Still Water | Special | 7 | Beats any Strike. Loses to everything else |
 | Broken Blade | Special | 8 | Take the enemy hit plus 4, then deal 8 |
 
-Starter deck: Hawk x2, Needle x2, Gate x2, Willow, Mist x2, Sparrow, Crane, Blade.
+## Fighting styles
+
+A style is a 12-card deck list. You pick yours; the AI picks at random. Both
+styles are shown, so you know the enemy's card mix.
+
+| Style | Hawk | Needle | Gate | Willow | Mist | Sparrow | Crane | Blade |
+|---|---|---|---|---|---|---|---|---|
+| Balanced | 2 | 2 | 2 | 1 | 2 | 1 | 1 | 1 |
+| Storm (Strike-heavy) | 3 | 3 | 1 | 1 | 1 | 2 | 0 | 1 |
+| Stone (Guard-heavy) | 1 | 1 | 3 | 2 | 1 | 2 | 1 | 1 |
+| Stream (Flow-heavy) | 1 | 1 | 1 | 1 | 3 | 3 | 1 | 1 |
+
+The styles form their own triangle: Stone beats Storm, Storm beats Stream,
+Stream beats Stone (about 55-60% each, random play). Every style sits between
+47% and 52% overall.
 
 ## Balance
 
-Average net damage of each card against a random card from the starter deck
+Average net damage of each card against a random card from the Balanced deck
 (first pass, from simulation): regular cards all sit between -0.6 and +0.6,
 Crane about +0.8, Broken Blade about +1.5. Games run about 8 rounds and
 almost always end on HP, not on empty hands.
@@ -50,6 +64,5 @@ Random card from hand, weighted 3:1 toward cards that beat the family you played
 
 ## Later, not now
 
-- Fighting styles as different deck lists
 - Weapons as per-family damage modifiers
 - AI that reads your discard pile

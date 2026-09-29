@@ -43,7 +43,8 @@
   #log { list-style: none; padding: 0; font-size: .85rem; color: var(--muted); max-height: 220px; overflow-y: auto; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   @media (max-width: 600px) { .row { grid-template-columns: 1fr; } .card { width: calc(50% - 4px); } }
-  #newGame { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  #newGame, #style { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);
              background: var(--panel); color: var(--ink); cursor: pointer; }
 </style>
 </head>
@@ -51,6 +52,11 @@
 <main>
   <h1>Wind in the Rushes</h1>
   <p class="meta">Strike beats Flow. Flow beats Guard. Guard beats Strike.</p>
+  <div class="controls">
+    <label for="style">Your style</label>
+    <select id="style"></select>
+    <button id="newGame">New game</button>
+  </div>
 
   <div class="row">
     <div class="side">
@@ -74,13 +80,31 @@
 
   <h2>Log</h2>
   <ul id="log"></ul>
-  <button id="newGame">New game</button>
 </main>
 
 <script src="game.js"></script>
 <script>
-  let state = newGame();
   const $ = (id) => document.getElementById(id);
+  let state;
+  const styleIds = Object.keys(STYLES);
+  $('style').innerHTML = styleIds.map((id) => `<option value="${id}">${STYLES[id].name}</option>`).join('');
+
+  function start() {
+    const aiStyle = styleIds[Math.floor(Math.random() * styleIds.length)];
+    state = newGame($('style').value, aiStyle);
+    render();
+  }
+
+  // Style name plus how many cards of each family its deck holds.
+  function styleSummary(id) {
+    const counts = {};
+    for (const card of STYLES[id].deck) {
+      const fam = CARDS[card].family;
+      counts[fam] = (counts[fam] || 0) + 1;
+    }
+    const parts = ['strike', 'guard', 'flow', 'special'].map((f) => `${f} ${counts[f] || 0}`);
+    return `${STYLES[id].name} (${parts.join(', ')})`;
+  }
 
   function chip(id) {
     const c = CARDS[id];
@@ -93,8 +117,8 @@
     $('aHp').textContent = `${Math.max(0, ai.hp)} / ${START_HP}`;
     $('pBar').style.width = `${Math.max(0, p.hp) / START_HP * 100}%`;
     $('aBar').style.width = `${Math.max(0, ai.hp) / START_HP * 100}%`;
-    $('pMeta').textContent = `Deck: ${p.deck.length}`;
-    $('aMeta').textContent = `Deck: ${ai.deck.length} | Hand: ${ai.hand.length}`;
+    $('pMeta').textContent = `${styleSummary(p.style)} | Deck: ${p.deck.length}`;
+    $('aMeta').textContent = `${styleSummary(ai.style)} | Deck: ${ai.deck.length} | Hand: ${ai.hand.length}`;
     $('aHand').innerHTML = ai.hand.map(() => '<div class="back"></div>').join('');
     $('pPile').innerHTML = p.discard.map(chip).join('');
     $('aPile').innerHTML = ai.discard.map(chip).join('');
@@ -118,8 +142,8 @@
     playRound(state, Number(btn.dataset.i), aiChoose(state));
     render();
   });
-  $('newGame').addEventListener('click', () => { state = newGame(); render(); });
-  render();
+  $('newGame').addEventListener('click', start);
+  start();
 </script>
 </body>
 </html>
