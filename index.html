@@ -289,21 +289,21 @@
     render();
   }
 
-  // Weapon name plus its family modifiers, e.g. "Staff (guard +2, strike -1)".
+  // Weapon name plus its damage modifiers, e.g. "Staff: Guard +2 dmg, Strike -1 dmg".
   function weaponSummary(id) {
-    const mods = Object.entries(WEAPONS[id].mods).map(([f, m]) => `${f} ${m > 0 ? '+' : ''}${m}`);
-    return mods.length ? `${WEAPONS[id].name} (${mods.join(', ')})` : WEAPONS[id].name;
+    const mods = Object.entries(WEAPONS[id].mods).map(([f, m]) => `${cap(f)} ${m > 0 ? '+' : ''}${m} dmg`);
+    return `${WEAPONS[id].name}: ${mods.length ? mods.join(', ') : 'no bonuses'}`;
   }
 
-  // Style name plus how many cards of each family its deck holds.
+  // Style name plus how many cards of each family it holds, e.g. "Balanced: 4 Strike, 3 Guard, 3 Flow, 2 Special cards".
   function styleSummary(id) {
     const counts = {};
     for (const card of STYLES[id].deck) {
       const fam = CARDS[card].family;
       counts[fam] = (counts[fam] || 0) + 1;
     }
-    const parts = ['strike', 'guard', 'flow', 'special'].map((f) => `${f} ${counts[f] || 0}`);
-    return `${STYLES[id].name} (${parts.join(', ')})`;
+    const parts = ['strike', 'guard', 'flow', 'special'].map((f) => `${counts[f] || 0} ${cap(f)}`);
+    return `${STYLES[id].name}: ${parts.join(', ')} cards`;
   }
 
   function chip(id) {
