@@ -32,6 +32,19 @@ Requires Node.js 18 or later:
 node --test
 ```
 
+## Balance simulation
+
+```sh
+node tools/simulate.js 1000            # 1,000 AI-vs-AI games
+node tools/simulate.js 3000 --seed 7   # more games, another seed
+```
+
+Both sides use the game's AI with random styles, weapons and items. The report
+covers win rates by style, weapon, item and loadout, each card's average HP
+swing per play, how games end, and how often the first fighter to reach half HP
+still wins. A fixed seed repeats the same games, so you can change a value in
+`game.js` and compare like for like.
+
 ## Project layout
 
 | File | What it holds |
@@ -39,6 +52,7 @@ node --test
 | `game.js` | Rules, cards, styles, weapons, items and the AI. No DOM access, so it runs in Node for tests. |
 | `index.html` | The page: layout, styles and rendering. |
 | `test/game.test.js` | Rule and AI tests. |
+| `tools/simulate.js` | The balance simulation. |
 | `DESIGN.md` | Design notes and the simulation results behind the balance numbers. |
 
 ## License

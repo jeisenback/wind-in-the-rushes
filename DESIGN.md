@@ -3,6 +3,7 @@
 A card-based rock-paper-scissors duel between swordmasters. One player against an AI.
 
 Play: open `index.html` in a browser. Tests: `node --test`.
+Balance numbers in this document come from `node tools/simulate.js` (see the README).
 
 ## Round
 
