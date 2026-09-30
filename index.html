@@ -19,6 +19,7 @@
     --strike: #b8431f; --guard: #2d4f9a; --flow: #2a7a57; --special: #7b4a8e;
     --posture: #a36f14;
     --stitch: rgba(27, 34, 51, .16); --back: #2a3552;
+    --you: #2f7f86; --foe: #8e2b3b; --spark: #d99a1e; --heal: #2a7a57; --reed: #8a9a7a;
     --display: 'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
     --body: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Segoe UI', system-ui, sans-serif;
     --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
@@ -30,6 +31,7 @@
       --strike: #e7774f; --guard: #86a6ee; --flow: #62c29a; --special: #c49ad9;
       --posture: #e3b04b;
       --stitch: rgba(233, 228, 214, .14); --back: #243155;
+      --you: #6cc5c9; --foe: #e07a8a; --spark: #f0c050; --heal: #62c29a; --reed: #6f8467;
       color-scheme: dark;
     }
   }
@@ -39,6 +41,7 @@
     --strike: #e7774f; --guard: #86a6ee; --flow: #62c29a; --special: #c49ad9;
     --posture: #e3b04b;
     --stitch: rgba(233, 228, 214, .14); --back: #243155;
+      --you: #6cc5c9; --foe: #e07a8a; --spark: #f0c050; --heal: #62c29a; --reed: #6f8467;
     color-scheme: dark;
   }
 
@@ -146,9 +149,12 @@
            background: repeating-linear-gradient(90deg, transparent 0 46px, color-mix(in srgb, var(--line) 45%, transparent) 46px 47px), var(--bg); }
   .clash .slot { display: grid; gap: 4px; justify-items: center; min-width: 0; }
   .clash .who { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
-  .clash .card { width: 100%; }
-  .clash .card.won { box-shadow: 0 0 0 3px var(--fam); }
-  .clash .card.lost { opacity: .55; }
+  /* The stage shows the actions; the readout names each card in its family color. */
+  .clash .played { font: 800 1rem/1.2 var(--display); color: var(--fam); text-align: center; padding: 4px 10px;
+                   border: 1.5px solid var(--fam); border-radius: 8px; background: color-mix(in srgb, var(--fam) 7%, var(--panel)); }
+  .clash .played.won { box-shadow: 0 0 0 2px var(--fam); }
+  .clash .played.lost { opacity: .6; }
+  .clash .played.placeholder { --fam: var(--line); color: var(--muted); border-style: dashed; background: transparent; font: 400 .8rem var(--body); }
   .clash .hit { font: 500 .9rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
   .clash .hit.hurt { color: var(--accent); font-weight: 500; }
   .clash .you { grid-area: you; } .clash .enemy { grid-area: enemy; }
@@ -160,15 +166,124 @@
   /* Before the first play: empty slots the same size as real cards, so nothing jumps. */
   .card.placeholder { --fam: var(--line); border-style: dashed; background: transparent; color: var(--muted);
                       place-content: center; text-align: center; font-size: .8rem; }
-  .clash.fresh .you .card { animation: from-left .3s ease-out; }
-  .clash.fresh .enemy .card { animation: from-right .3s ease-out; }
+  .clash.fresh .you .played { animation: from-left .3s ease-out; }
+  .clash.fresh .enemy .played { animation: from-right .3s ease-out; }
   @keyframes from-left { from { transform: translateX(-14px); opacity: 0; } }
   @keyframes from-right { from { transform: translateX(14px); opacity: 0; } }
   @media (prefers-reduced-motion: reduce) {
-    .clash.fresh .card { animation: none !important; }
+    .clash.fresh .played { animation: none !important; }
     .bar > div, button.card { transition: none; }
   }
 
+  /* The stage */
+  .stage { position: relative; height: clamp(220px, 34vw, 240px); border: 1px solid var(--line); border-radius: 12px;
+           background: var(--panel); overflow: hidden; cursor: pointer; scroll-margin-top: 72px; }
+  .ground { position: absolute; inset: auto 0 18px 0; height: 1.5px; background: var(--line); }
+  .reeds { position: absolute; inset: auto 0 18px 0; height: 46px; width: 100%; }
+  .reeds path { fill: none; stroke: var(--reed); stroke-width: 1.4; stroke-linecap: round; opacity: .55; }
+  .fslot { position: absolute; bottom: 14px; width: 30%; max-width: 150px; aspect-ratio: 120 / 160; }
+  .fslot.you { left: 16%; }
+  .fslot.foe { right: 16%; transform: scaleX(-1); }
+  .fname { position: absolute; top: 8px; font: 700 .72rem var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .fname.you { left: 12px; } .fname.foe { right: 12px; text-align: right; }
+  .callout { position: absolute; top: 26px; max-width: 46%; font: 800 .95rem/1.2 var(--display); opacity: 0; transition: opacity .15s; }
+  .callout .with-item { display: block; font: 500 .75rem var(--body); color: var(--muted); }
+  .callout.foe { text-align: right; }
+  .callout.you { left: 12px; } .callout.foe { right: 12px; }
+  .callout.show { opacity: 1; }
+  .float { position: absolute; font: 800 1.35rem var(--display); color: var(--accent); pointer-events: none; animation: float 1.1s ease-out forwards;
+           text-shadow: 0 0 6px var(--panel), 0 0 2px var(--panel); }
+  .float.heal { color: var(--heal); }
+  @keyframes float { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-34px); opacity: 0; } }
+  .spark { position: absolute; left: 50%; top: 42%; width: 44px; height: 44px; margin: -22px 0 0 -22px; opacity: 0; pointer-events: none; }
+  .spark path { fill: var(--spark); }
+  .spark.go { animation: spark .35s ease-out; }
+  @keyframes spark { 0% { opacity: 1; transform: scale(.3) rotate(0); } 100% { opacity: 0; transform: scale(1.4) rotate(40deg); } }
+  /* Deathblow: one tapered brush stroke across the fighter whose guard broke. */
+  .slash { position: absolute; top: 12%; width: 34%; height: 70%; pointer-events: none; opacity: 0; }
+  .slash.at-you { left: 8%; } .slash.at-foe { right: 8%; }
+  .slash path { fill: var(--accent); clip-path: inset(0 100% 0 0); }
+  .slash.go { animation: slash-fade 1.1s ease-out forwards; }
+  .slash.go path { animation: slash-draw .22s ease-out forwards; }
+  @keyframes slash-draw { to { clip-path: inset(0 0 0 0); } }
+  @keyframes slash-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+  .knife { position: absolute; top: 44%; left: 30%; width: 26px; height: 3px; background: var(--ink); border-radius: 2px; opacity: 0; }
+  .knife.go { animation: knife .35s linear forwards; }
+  @keyframes knife { 0% { opacity: 1; transform: translateX(0) rotate(0); } 100% { opacity: 1; transform: translateX(var(--dist, 300px)) rotate(720deg); } }
+
+  /* Fighter figure: parts rotate around their joints. */
+  .fighter { width: 100%; height: 100%; overflow: visible; }
+  .fighter .ink { stroke: var(--ink); stroke-linecap: round; fill: none; }
+  .fighter .fill { fill: var(--ink); }
+  .fighter .sash { fill: var(--sash); }
+  .fighter .sash-line { stroke: var(--sash); fill: none; stroke-linecap: round; }
+  .fslot.you { --sash: var(--you); } .fslot.foe { --sash: var(--foe); }
+  .fighter .body, .fighter .torso, .fighter .arm, .fighter .leg { transition: transform .16s ease-out; }
+  .fighter .torso, .fighter .leg { transform-origin: 60px 100px; }
+  .fighter .arm { transform-origin: 62px 62px; }
+  .fighter.idle .torso { animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: rotate(1.6deg); } }
+  .fighter.idle .arm.front { transform: rotate(8deg); }
+
+  /* Poses. Facing right; the enemy slot is mirrored. */
+  .fighter.strike .body { transform: translateX(26px); }
+  .fighter.strike .torso { transform: rotate(12deg); }
+  .fighter.strike .arm.front { transform: rotate(34deg); }
+  .fighter.strike .leg.front { transform: rotate(-20deg); }
+  .fighter.strike .leg.back { transform: rotate(24deg); }
+
+  .fighter.guard .body { transform: translate(4px, 3px); }
+  .fighter.guard .torso { transform: rotate(-4deg); }
+  .fighter.guard .arm.front { transform: rotate(-38deg); }
+  .fighter.guard .arm.back { transform: rotate(-70deg); }
+  .fighter.guard .leg.front { transform: rotate(-12deg); }
+  .fighter.guard .leg.back { transform: rotate(14deg); }
+
+  .fighter.flow .body { transform: translate(-14px, -5px); }
+  .fighter.flow .torso { transform: rotate(-15deg); }
+  .fighter.flow .arm.front { transform: rotate(42deg); }
+  .fighter.flow .leg.front { transform: rotate(-6deg); }
+  .fighter.flow .leg.back { transform: rotate(20deg); }
+
+  .fighter.crane .body { transform: translateY(-6px); }
+  .fighter.crane .leg.front { transform: rotate(-48deg); }
+  .fighter.crane .arm.front { transform: rotate(-62deg); }
+  .fighter.crane .arm.back { transform: rotate(-125deg); }
+
+  .fighter.blade .body { transform: translateX(46px); }
+  .fighter.blade .torso { transform: rotate(20deg); }
+  .fighter.blade .arm.front { transform: rotate(28deg); }
+  .fighter.blade .arm.back { transform: rotate(-40deg); }
+  .fighter.blade .leg.front { transform: rotate(-30deg); }
+  .fighter.blade .leg.back { transform: rotate(34deg); }
+
+  .fighter.hit .body { transform: translateX(-12px); }
+  .fighter.hit .torso { transform: rotate(-17deg); }
+  .fighter.hit .arm.front { transform: rotate(-22deg); }
+
+  .fighter.broken .body { transform: translate(-10px, 8px); }
+  .fighter.broken .torso { transform: rotate(34deg); }
+  .fighter.broken .arm.front { transform: rotate(95deg); }
+  .fighter.broken .arm.back { transform: rotate(40deg); }
+  .fighter.broken .leg.front { transform: rotate(-22deg); }
+  .fighter.broken .leg.back { transform: rotate(28deg); }
+
+  .fighter.throw .arm.back { transform: rotate(-150deg); }
+  .fighter.throw .torso { transform: rotate(-6deg); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fighter .body, .fighter .torso, .fighter .arm, .fighter .leg { transition: none; }
+    .fighter.idle .torso { animation: none; }
+    .spark.go, .slash.go path, .knife.go, .float { animation-duration: .01s; }
+  }
+
+  .puff { position: absolute; top: 34%; width: 70px; height: 70px; margin-left: -35px; border-radius: 50%; pointer-events: none;
+          background: radial-gradient(circle, color-mix(in srgb, var(--muted) 55%, transparent), transparent 70%);
+          animation: puff .8s ease-out forwards; }
+  @keyframes puff { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+  .burst { position: absolute; top: 30%; width: 48px; height: 48px; margin-left: -24px; pointer-events: none; animation: spark .4s ease-out forwards; }
+  .burst path { fill: var(--accent); }
+  .float.soft { color: var(--muted); font-size: 1rem; }
   #banner { font: 800 1.2rem/1.3 var(--display); min-height: 1.3em; text-align: center; text-wrap: balance; }
   .over { display: grid; gap: 6px; justify-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
   .over-title { font: 800 1.8rem/1 var(--display); }
@@ -196,8 +311,13 @@
     .hp { grid-template-columns: 4rem 1fr 3.8rem; }
   }
   @media (max-width: 480px) {
+    /* On phones the stage shows the action, so the readout keeps only the rule and the numbers. */
+    .stage { height: 180px; }
+    .fname { display: none; }
+    .callout { top: 8px; font-size: .82rem; }
+    .fslot { width: 25%; }
+    .clash .vs, .clash .result { display: none; }
     .clash { grid-template-columns: 1fr 1fr; grid-template-areas: "you enemy" "mid mid"; gap: 10px; padding: 10px; }
-    .clash .card { min-height: 0; padding: 7px; }
     .clash .text { display: none; }
     .triangle { width: 140px; }
   }
@@ -242,7 +362,7 @@
   </details>
 
   <div class="controls">
-    <label class="field"><span>Style</span><select id="style"></select></label>
+    <label class="field"><span>Fighter</span><select id="style"></select></label>
     <label class="field"><span>Weapon</span><select id="weapon"></select></label>
     <label class="field"><span>Item 1</span><select id="item1"></select></label>
     <label class="field"><span>Item 2</span><select id="item2"></select></label>
@@ -262,6 +382,24 @@
     <p class="sub">Discards</p>
     <div class="pile" id="aPile"></div>
   </section>
+
+  <div class="stage" id="stage" aria-label="Duel stage">
+    <svg class="reeds" viewBox="0 0 800 46" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M20 46 Q24 20 16 4"/><path d="M34 46 Q30 22 40 8"/><path d="M60 46 Q66 28 58 14"/>
+      <path d="M700 46 Q706 18 698 2"/><path d="M728 46 Q722 24 734 10"/><path d="M760 46 Q768 26 756 12"/><path d="M782 46 Q778 30 790 18"/>
+      <path d="M380 46 Q384 34 378 26"/><path d="M420 46 Q416 32 424 24"/>
+    </svg>
+    <div class="ground"></div>
+    <div class="fname you" id="youName"></div>
+    <div class="fname foe" id="foeName"></div>
+    <div class="callout you" id="youCall"></div>
+    <div class="callout foe" id="foeCall"></div>
+    <div class="fslot you" id="youSlot"></div>
+    <div class="fslot foe" id="foeSlot"></div>
+    <svg class="spark" id="spark" viewBox="-22 -22 44 44" aria-hidden="true"><path d="M0-20 L4-5 L20 0 L4 5 L0 20 L-4 5 L-20 0 L-4-5 Z"/></svg>
+    <svg class="slash" id="slash" viewBox="0 0 200 140" preserveAspectRatio="none" aria-hidden="true"><path d="M8 126 Q90 70 196 10 Q100 78 14 132 Z"/></svg>
+    <div class="knife" id="knife"></div>
+  </div>
 
   <div class="clash" id="clash"></div>
   <div id="banner" aria-live="polite"></div>
@@ -286,10 +424,17 @@
 <script src="game.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
+  // Each style is a character with its own silhouette details.
+  const CHARACTERS = {
+    balanced: { name: 'The Wanderer' },
+    storm: { name: 'The Tempest' },
+    stone: { name: 'The Sentinel' },
+    stream: { name: 'The Dancer' },
+  };
   let state;
   const styleIds = Object.keys(STYLES);
   const weaponIds = Object.keys(WEAPONS);
-  $('style').innerHTML = styleIds.map((id) => `<option value="${id}">${STYLES[id].name}</option>`).join('');
+  $('style').innerHTML = styleIds.map((id) => `<option value="${id}">${CHARACTERS[id].name} (${STYLES[id].name})</option>`).join('');
   $('weapon').innerHTML = weaponIds.map((id) => `<option value="${id}">${weaponSummary(id)}</option>`).join('');
   const randomOf = (list) => list[Math.floor(Math.random() * list.length)];
   const itemIds = Object.keys(ITEMS);
@@ -304,6 +449,172 @@
   };
   let chosenItem = null; // the item the player will use with their next card
 
+
+  // Head and shoulder details that tell the characters apart.
+  function accessories(style) {
+    switch (style) {
+      case 'balanced': // a wide straw hat
+        return '<path class="fill" d="M44 42 L63 27 L82 42 Q63 46 44 42 Z"/>';
+      case 'storm': // a headband with trailing tails
+        return '<path class="sash-line" stroke-width="3" d="M55 41 L71 41"/>'
+          + '<path class="sash-line" stroke-width="2.5" d="M55 41 Q44 40 36 47"/><path class="sash-line" stroke-width="2.5" d="M55 42 Q46 45 40 53"/>';
+      case 'stone': // a crested helmet and broad shoulder plates
+        return '<path class="fill" d="M53 42 Q63 26 73 42 Z"/><path class="fill" d="M62 30 L64 22 L66 30 Z"/>'
+          + '<rect class="fill" x="48" y="54" width="28" height="9" rx="3"/>';
+      case 'stream': // a long ponytail
+        return '<path class="ink" stroke-width="4" d="M56 38 Q42 36 34 50"/>';
+      default: return '';
+    }
+  }
+
+  // Weapons are drawn from the front hand, which sits at (80, 78).
+  function weaponShape(weapon) {
+    switch (weapon) {
+      case 'sword': return '<path class="ink" stroke-width="3" d="M80 78 L112 48"/><path class="ink" stroke-width="3" d="M76 72 L86 82"/>';
+      case 'greatblade': return '<path class="ink" stroke-width="6" d="M80 78 L120 38"/><path class="ink" stroke-width="3.5" d="M74 70 L88 84"/>';
+      case 'staff': return '<path class="ink" stroke-width="3.5" d="M62 96 L114 44"/>';
+      case 'knives': return '<path class="ink" stroke-width="3" d="M80 78 L96 64"/>';
+      default: return '';
+    }
+  }
+
+  function fighterSvg(style, weapon) {
+    const slim = style === 'stream' ? 13 : style === 'stone' ? 18 : 15;
+    const backKnife = weapon === 'knives' ? '<path class="ink" stroke-width="3" d="M50 82 L42 94"/>' : '';
+    return `<svg class="fighter idle" viewBox="0 0 120 160" aria-hidden="true">
+      <g class="body">
+        <g class="leg back"><path class="ink" stroke-width="7" d="M60 100 L48 150"/></g>
+        <g class="leg front"><path class="ink" stroke-width="7" d="M60 100 L74 150"/></g>
+        <path class="fill" d="M51 92 L69 92 L80 130 L42 130 Z"/>
+        <g class="torso">
+          <g class="arm back"><path class="ink" stroke-width="6" d="M62 62 L50 82"/>${backKnife}</g>
+          <path class="ink" stroke-width="${slim}" d="M60 98 L62 60"/>
+          <rect class="sash" x="51" y="88" width="19" height="6" rx="2"/>
+          <circle class="fill" cx="63" cy="44" r="9"/>
+          ${accessories(style)}
+          <g class="arm front"><path class="ink" stroke-width="6" d="M62 62 L80 78"/>${weaponShape(weapon)}</g>
+        </g>
+      </g>
+    </svg>`;
+  }
+
+
+  // ---- Duel stage: the fighters act out each round ----
+
+  const fighterEl = (side) => $(`${side}Slot`).querySelector('.fighter');
+  const setPose = (side, pose) => fighterEl(side).setAttribute('class', `fighter ${pose}`);
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // The pose for a card: its family, or its own pose for the two special cards.
+  const poseFor = (id) => ({ strike: 'strike', guard: 'guard', flow: 'flow' }[CARDS[id].family] || id);
+
+  function drawFighters() {
+    for (const [side, f] of [['you', state.player], ['foe', state.ai]]) {
+      $(`${side}Slot`).innerHTML = fighterSvg(f.style, f.weapon);
+      $(`${side}Name`).textContent = CHARACTERS[f.style].name;
+    }
+    clearScene();
+  }
+
+  let timers = [];
+  let pending = null; // the step that reveals the result, while a scene is playing
+  const later = (ms, fn) => timers.push(setTimeout(fn, reduced() ? 0 : ms));
+  function clearScene() {
+    timers.forEach(clearTimeout);
+    timers = [];
+    pending = null; // a cancelled scene must not leave the hand locked
+    for (const id of ['spark', 'slash', 'knife']) $(id).classList.remove('go');
+    $('stage').querySelectorAll('.float, .puff, .burst').forEach((el) => el.remove());
+    $('youCall').classList.remove('show');
+    $('foeCall').classList.remove('show');
+  }
+  function restart(el) { el.classList.remove('go'); void el.getBoundingClientRect(); el.classList.add('go'); }
+
+  // A number or word floating up over one fighter.
+  function floatText(side, text, kind = '') {
+    const el = document.createElement('div');
+    el.className = `float ${kind}`;
+    el.textContent = text;
+    el.style.top = kind ? '48%' : '34%';
+    el.style[side === 'you' ? 'left' : 'right'] = '27%';
+    $('stage').appendChild(el);
+  }
+
+  // A one-off effect element centered over one fighter.
+  function effectAt(side, className, html = '') {
+    const el = document.createElement('div');
+    el.className = className;
+    el.innerHTML = html;
+    el.style.left = side === 'you' ? '28%' : '72%';
+    $('stage').appendChild(el);
+  }
+
+  function throwKnife(from) {
+    const knife = $('knife');
+    const width = $('stage').getBoundingClientRect().width;
+    knife.style.left = from === 'you' ? '30%' : '66%';
+    knife.style.setProperty('--dist', `${(from === 'you' ? 1 : -1) * width * 0.36}px`);
+    restart(knife);
+  }
+
+  // Where fighters rest after a round: the loser of the fight stays down.
+  function restingPoses() {
+    const loser = state.over && { player: 'you', ai: 'foe' }[{ player: 'ai', ai: 'player' }[state.winner]];
+    setPose('you', loser === 'you' ? 'broken' : 'idle');
+    setPose('foe', loser === 'foe' ? 'broken' : 'idle');
+  }
+
+  // Plays the last round on the stage. `reveal` updates the rest of the page and
+  // runs at the moment of contact, so the numbers never spoil the scene.
+  function playScene(reveal) {
+    clearScene();
+    const L = state.last;
+    const sides = [
+      { side: 'you', card: L.player, item: L.items.player, took: L.toPlayer, broke: L.pBroke, heal: L.healPlayer, clear: L.clearPlayer, other: 'foe' },
+      { side: 'foe', card: L.ai, item: L.items.ai, took: L.toAi, broke: L.aBroke, heal: L.healAi, clear: L.clearAi, other: 'you' },
+    ];
+    for (const s of sides) {
+      $(`${s.side}Call`).innerHTML = CARDS[s.card].name + (s.item ? `<span class="with-item">+ ${ITEMS[s.item].name}</span>` : '');
+    }
+    pending = () => {
+      pending = null;
+      if (L.toPlayer || L.toAi) restart($('spark'));
+      for (const s of sides) {
+        if (s.item === 'smoke' && !s.took) effectAt(s.side, 'puff');
+        if (s.item === 'firecracker') effectAt(s.other, 'burst', '<svg viewBox="-22 -22 44 44"><path d="M0-20 L4-5 L20 0 L4 5 L0 20 L-4 5 L-20 0 L-4-5 Z"/></svg>');
+        if (s.took) {
+          setPose(s.side, s.broke ? 'broken' : 'hit');
+          floatText(s.side, `-${s.took}`);
+        }
+        if (s.heal) floatText(s.side, `+${s.heal} HP`, 'heal');
+        if (s.clear) floatText(s.side, `-${s.clear} posture`, 'soft');
+        if (s.broke) { $('slash').setAttribute('class', `slash at-${s.side}`); restart($('slash')); }
+      }
+      reveal();
+    };
+    later(40, () => {
+      setPose('you', poseFor(L.player));
+      setPose('foe', poseFor(L.ai));
+      $('youCall').classList.add('show');
+      $('foeCall').classList.add('show');
+      for (const s of sides) if (s.item === 'knife') throwKnife(s.side);
+    });
+    later(340, () => pending && pending());
+    later(1050, () => {
+      for (const side of ['you', 'foe']) if (!fighterEl(side).classList.contains('broken')) setPose(side, 'idle');
+    });
+    later(1700, () => { restingPoses(); timers = []; });
+  }
+
+  // Tap the stage to skip to the end of the scene.
+  $('stage').addEventListener('click', () => {
+    if (!timers.length) return;
+    const reveal = pending;
+    clearScene();
+    if (reveal) reveal();
+    restingPoses();
+  });
+
   function start() {
     state = newGame(
       { style: $('style').value, weapon: $('weapon').value, belt: [$('item1').value, $('item2').value] },
@@ -312,6 +623,7 @@
     chosenItem = null;
     $('beltHint').innerHTML = [$('item1').value, $('item2').value]
       .map((id) => `<strong>${ITEMS[id].name}:</strong> ${ITEMS[id].text}`).join(' ');
+    drawFighters();
     render();
   }
 
@@ -329,7 +641,7 @@
       counts[fam] = (counts[fam] || 0) + 1;
     }
     const parts = ['strike', 'guard', 'flow', 'special'].map((f) => `${counts[f] || 0} ${cap(f)}`);
-    return `${STYLES[id].name}: ${parts.join(', ')} cards`;
+    return `${CHARACTERS[id].name} (${STYLES[id].name}): ${parts.join(', ')} cards`;
   }
 
   function chip(id) {
@@ -368,10 +680,10 @@
     const el = $('clash');
     if (!last) {
       el.innerHTML = `
-        <div class="slot you"><div class="who">You</div><div class="card placeholder">Your card</div></div>
+        <div class="slot you"><div class="who">You</div><div class="played placeholder">Your card</div></div>
         <div class="mid"><div class="vs">ROUND 1</div><div class="rule">Choose a form</div>
           <div class="result">Play a card from your hand. Both cards are revealed here, with the rule that decided it.</div></div>
-        <div class="slot enemy"><div class="who">Enemy</div><div class="card placeholder">Enemy card</div></div>`;
+        <div class="slot enemy"><div class="who">Enemy</div><div class="played placeholder">Enemy card</div></div>`;
       return;
     }
     const pClass = last.toPlayer < last.toAi ? 'won' : last.toPlayer > last.toAi ? 'lost' : '';
@@ -390,9 +702,9 @@
     const postureSource = (card, pos, item) => (item !== 'firecracker' ? CARDS[card].name
       : pos > ITEMS.firecracker.amount ? `${CARDS[card].name} and Firecracker ${ITEMS.firecracker.amount}` : 'Firecracker');
     el.innerHTML = `
-      <div class="slot you"><div class="who">You</div>${cardFace(last.player, state.player.weapon, 'div', '', pClass)}${hit(last.toPlayer, last.partsPlayer, last.postureToPlayer, last.ai, last.pBroke, last.items.player, last.items.ai, last.healPlayer, last.clearPlayer)}</div>
+      <div class="slot you"><div class="who">You</div><div class="played ${CARDS[last.player].family} ${pClass}">${CARDS[last.player].name}</div>${hit(last.toPlayer, last.partsPlayer, last.postureToPlayer, last.ai, last.pBroke, last.items.player, last.items.ai, last.healPlayer, last.clearPlayer)}</div>
       <div class="mid"><div class="vs">ROUND ${last.round}</div><div class="rule">${last.rule}</div><div class="result">${last.text}</div></div>
-      <div class="slot enemy"><div class="who">Enemy</div>${cardFace(last.ai, state.ai.weapon, 'div', '', aClass)}${hit(last.toAi, last.partsAi, last.postureToAi, last.player, last.aBroke, last.items.ai, last.items.player, last.healAi, last.clearAi)}</div>`;
+      <div class="slot enemy"><div class="who">Enemy</div><div class="played ${CARDS[last.ai].family} ${aClass}">${CARDS[last.ai].name}</div>${hit(last.toAi, last.partsAi, last.postureToAi, last.player, last.aBroke, last.items.ai, last.items.player, last.healAi, last.clearAi)}</div>`;
     el.classList.remove('fresh');
     void el.offsetWidth; // restart the deal animation
     el.classList.add('fresh');
@@ -465,21 +777,21 @@
 
   $('pHand').addEventListener('click', (e) => {
     const btn = e.target.closest('button.card');
-    if (!btn || state.over) return;
+    // One card per round: ignore taps while the stage is still playing.
+    if (!btn || state.over || pending) return;
     const enemy = aiMove(state);
     playRound(state, Number(btn.dataset.i), enemy.card, Math.random, { player: chosenItem, ai: enemy.item });
     chosenItem = null;
-    render();
-    // If the result is above the screen (you were down at your hand), bring it
-    // into view just under the scoreboard; your hand sits right below it.
-    if ($('clash').getBoundingClientRect().top < $('score').getBoundingClientRect().bottom) {
-      const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-      $('clash').scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+    // If the stage is above the screen (you were down at your hand), bring it
+    // into view just under the scoreboard.
+    if ($('stage').getBoundingClientRect().top < $('score').getBoundingClientRect().bottom) {
+      $('stage').scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' });
     }
+    playScene(render);
   });
   $('pItems').addEventListener('click', (e) => {
     const btn = e.target.closest('button.item');
-    if (!btn) return;
+    if (!btn || pending) return; // choosing now would redraw the page before the scene reveals
     chosenItem = chosenItem === btn.dataset.item ? null : btn.dataset.item;
     render();
   });

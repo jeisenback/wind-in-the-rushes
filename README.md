@@ -14,8 +14,9 @@ their guard.
   guard for a 5-damage deathblow.
 - **Desperation:** at 10 HP or less you gain Clarity (one enemy card is revealed
   each round) and Broken Blade joins your hand. The enemy gets the same.
-- **Loadout:** before the fight, pick a fighting style (your deck), a weapon
-  (bonuses and penalties by family) and two single-use items.
+- **Loadout:** before the fight, pick a fighter (each fighter's style is your
+  deck), a weapon (bonuses and penalties by family) and two single-use items.
+- Each round plays out on a duel stage; tap it to skip.
 - The fight ends when someone reaches 0 HP.
 
 Every clash shows the rule that decided it and how each number adds up.
