@@ -109,7 +109,8 @@
   /* Cards */
   .card { width: 158px; min-height: 132px; text-align: left; padding: 10px 11px; border-radius: 10px; display: grid; align-content: start; gap: 3px;
           border: 1.5px solid var(--fam); background: color-mix(in srgb, var(--fam) 7%, var(--panel)); color: var(--ink); }
-  .card .fam { display: flex; align-items: center; gap: 6px; color: var(--fam); font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .card .beats { margin-left: auto; font-weight: 500; letter-spacing: .02em; text-transform: none; color: var(--muted); white-space: nowrap; }
+  .card .fam { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; color: var(--fam); font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
   .card .glyph { width: 18px; height: 18px; flex: none; }
   .card .glyph path { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .card .name { font: 800 1.08rem/1.2 var(--display); margin-top: 2px; }
@@ -132,9 +133,14 @@
   button.item strong { color: var(--posture); }
   button.item.on { border-style: solid; background: var(--posture); color: var(--panel); }
   button.item.on strong { color: var(--panel); }
+  .item-note { display: none; flex-basis: 100%; font-size: .78rem; color: var(--muted); }
+  @media (max-width: 600px) {
+    .items .meta, .item-text { display: none; }
+    .item-note { display: block; }
+  }
 
   /* The clash: the mat between the two fighters. */
-  .clash { display: grid; grid-template-columns: minmax(0, 170px) minmax(0, 1fr) minmax(0, 170px);
+  .clash { scroll-margin-top: 72px; display: grid; grid-template-columns: minmax(0, 170px) minmax(0, 1fr) minmax(0, 170px);
            grid-template-areas: "you mid enemy"; gap: 14px; align-items: start; justify-content: center;
            padding: 16px; border-radius: 12px; border: 1px solid var(--line);
            background: repeating-linear-gradient(90deg, transparent 0 46px, color-mix(in srgb, var(--line) 45%, transparent) 46px 47px), var(--bg); }
@@ -151,7 +157,9 @@
   .clash .rule { font: 800 clamp(1.15rem, 3vw, 1.5rem)/1.2 var(--display); margin-top: 6px; text-wrap: balance; }
   .clash .result { color: var(--muted); font-size: .9rem; margin-top: 6px; text-wrap: pretty; }
   .clash .why { font-size: .74rem; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
-  .clash .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 18px 0; font-family: var(--display); font-size: 1.05rem; }
+  /* Before the first play: empty slots the same size as real cards, so nothing jumps. */
+  .card.placeholder { --fam: var(--line); border-style: dashed; background: transparent; color: var(--muted);
+                      place-content: center; text-align: center; font-size: .8rem; }
   .clash.fresh .you .card { animation: from-left .3s ease-out; }
   .clash.fresh .enemy .card { animation: from-right .3s ease-out; }
   @keyframes from-left { from { transform: translateX(-14px); opacity: 0; } }
@@ -162,6 +170,22 @@
   }
 
   #banner { font: 800 1.2rem/1.3 var(--display); min-height: 1.3em; text-align: center; text-wrap: balance; }
+  .over { display: grid; gap: 6px; justify-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  .over-title { font: 800 1.8rem/1 var(--display); }
+  .over.won .over-title { color: var(--flow); } .over.lost .over-title { color: var(--accent); }
+  .over-sub { font: 400 .9rem var(--body); color: var(--muted); }
+  #again { margin-top: 4px; padding: 8px 18px; border-radius: 6px; border: 0; cursor: pointer;
+           background: var(--ink); color: var(--bg); font: 700 .95rem var(--body); }
+  /* Pinned scoreboard: both fighters' state stays in view while you choose. */
+  .scoreboard { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; justify-content: space-between;
+                align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 10px;
+                background: var(--panel); font: 500 .8rem var(--mono); font-variant-numeric: tabular-nums;
+                box-shadow: 0 4px 12px -8px rgba(0, 0, 0, .35); }
+  .scoreboard b { color: var(--accent); font-weight: 500; }
+  .scoreboard .sb-round { color: var(--muted); }
+  .scoreboard .sb-side { display: grid; gap: 1px; }
+  .scoreboard .sb-enemy { text-align: right; }
+  .scoreboard .sb-pos { color: var(--muted); font-size: .72rem; }
 
   .log { font-size: .84rem; color: var(--muted); }
   .log summary { cursor: pointer; color: var(--ink); font-weight: 700; width: fit-content; }
@@ -226,6 +250,8 @@
     <p class="hint" id="beltHint"></p>
   </div>
 
+  <div class="scoreboard" id="score" aria-hidden="true"></div>
+
   <section class="side" aria-label="Enemy">
     <div class="who-line"><h2>Enemy</h2></div>
     <div class="hp">HP <div class="bar"><div id="aBar"></div></div> <span class="num" id="aHp"></span></div>
@@ -242,11 +268,11 @@
 
   <section class="side" aria-label="You">
     <div class="who-line"><h2>You</h2></div>
+    <div class="items" id="pItems"></div>
+    <div class="hand" id="pHand"></div>
     <div class="hp">HP <div class="bar"><div id="pBar"></div></div> <span class="num" id="pHp"></span></div>
     <div class="hp">Posture <div class="bar pos" id="pPosBar"><div id="pPos"></div></div> <span class="num" id="pPosN"></span></div>
     <div class="tags" id="pMeta"></div>
-    <div class="items" id="pItems"></div>
-    <div class="hand" id="pHand"></div>
     <p class="sub">Discards</p>
     <div class="pile" id="pPile"></div>
   </section>
@@ -319,11 +345,17 @@
     special: '<path d="M11 3 A8 8 0 1 0 18.6 8.5"/>',
   };
 
+  // What a card beats, for the card face: "beats Flow", or nothing for Broken Blade.
+  function beatsLine(c) {
+    if (c.id === 'crane') return 'beats Strike';
+    return c.family === 'special' ? '' : `beats ${cap(BEATS[c.family])}`;
+  }
+
   // One card face; `tag` is 'button' for the playable hand, 'div' elsewhere.
   function cardFace(id, weapon, tag = 'div', attrs = '', extraClass = '') {
     const c = CARDS[id];
     return `<${tag} class="card ${c.family} ${extraClass}" ${attrs}>
-      <div class="fam"><svg class="glyph" viewBox="0 0 22 22" aria-hidden="true">${GLYPHS[c.family]}</svg>${c.family}</div>
+      <div class="fam"><svg class="glyph" viewBox="0 0 22 22" aria-hidden="true">${GLYPHS[c.family]}</svg>${c.family}${beatsLine(c) ? `<span class="beats">${beatsLine(c)}</span>` : ''}</div>
       <div class="stats">${cardDamage(id, weapon)} dmg | ${c.posture} posture</div>
       <div class="name">${c.name}</div>
       <div class="text">${c.text}</div>
@@ -335,7 +367,11 @@
     const last = state.last;
     const el = $('clash');
     if (!last) {
-      el.innerHTML = '<div class="empty">Play a card from your hand. Both cards will show here.</div>';
+      el.innerHTML = `
+        <div class="slot you"><div class="who">You</div><div class="card placeholder">Your card</div></div>
+        <div class="mid"><div class="vs">ROUND 1</div><div class="rule">Choose a form</div>
+          <div class="result">Play a card from your hand. Both cards are revealed here, with the rule that decided it.</div></div>
+        <div class="slot enemy"><div class="who">Enemy</div><div class="card placeholder">Enemy card</div></div>`;
       return;
     }
     const pClass = last.toPlayer < last.toAi ? 'won' : last.toPlayer > last.toAi ? 'lost' : '';
@@ -381,8 +417,11 @@
     $('pMeta').innerHTML = tags(p, []);
     $('aMeta').innerHTML = tags(ai, [tag('Hand', ai.hand.length),
       tag('Items left', ai.items.length ? ai.items.map((id) => ITEMS[id].name).join(', ') : 'none')]);
+    // On narrow screens the buttons show names only; the chosen item's effect is spelled out below them.
     $('pItems').innerHTML = p.items.length && !state.over
-      ? '<span class="meta">Use an item with your next card:</span>' + p.items.map((id) => `<button class="item${id === chosenItem ? ' on' : ''}" data-item="${id}" aria-pressed="${id === chosenItem}" ><strong>${ITEMS[id].name}:</strong> ${ITEMS[id].text}</button>`).join('')
+      ? '<span class="meta">Use an item with your next card:</span>'
+        + p.items.map((id) => `<button class="item${id === chosenItem ? ' on' : ''}" data-item="${id}" aria-pressed="${id === chosenItem}"><strong>${ITEMS[id].name}</strong><span class="item-text">: ${ITEMS[id].text}</span></button>`).join('')
+        + `<span class="item-note">${chosenItem ? `${ITEMS[chosenItem].name}: ${ITEMS[chosenItem].text} It will be used with your next card. Tap it again to cancel.` : 'Tap an item to use it with your next card.'}</span>`
       : `<span class="meta">${p.items.length ? '' : 'No items left.'}</span>`;
     const seen = state.over ? null : state.clarity.player;
     $('aHand').innerHTML = ai.hand
@@ -404,11 +443,24 @@
       .join('');
     renderClash();
     $('log').innerHTML = state.log.slice().reverse().map((l) => `<li>${l}</li>`).join('');
-    $('banner').textContent = state.over
-      ? { player: 'Victory.', ai: 'Defeat.', draw: 'A draw.' }[state.winner]
+    const rounds = state.round - 1;
+    $('banner').innerHTML = state.over
+      ? `<div class="over ${{ player: 'won', ai: 'lost', draw: '' }[state.winner]}">
+          <div class="over-title">${{ player: 'Victory.', ai: 'Defeat.', draw: 'A draw.' }[state.winner]}</div>
+          <div class="over-sub">${{
+            player: `You won in ${rounds} rounds with ${p.hp} HP left.`,
+            ai: `The enemy won in ${rounds} rounds with ${ai.hp} HP left.`,
+            draw: `Both fighters fell in round ${rounds}.`,
+          }[state.winner]}</div>
+          <button id="again">Play again</button>
+        </div>`
       : `Round ${state.round}: choose a form.`
         + (state.last?.joined?.player ? ' Broken Blade joins your hand.' : '')
         + (state.last?.joined?.ai ? ' Broken Blade joins the enemy hand.' : '');
+    const side = (label, f) => `<span class="sb-side sb-${label.toLowerCase()}"><span>${label} <b>${Math.max(0, f.hp)}</b> HP</span>`
+      + `<span class="sb-pos">posture ${f.posture}/${POSTURE_MAX}</span></span>`;
+    $('score').innerHTML = side('You', p)
+      + `<span class="sb-round">${state.over ? 'Fight over' : `Round ${state.round}`}</span>` + side('Enemy', ai);
   }
 
   $('pHand').addEventListener('click', (e) => {
@@ -417,9 +469,13 @@
     const enemy = aiMove(state);
     playRound(state, Number(btn.dataset.i), enemy.card, Math.random, { player: chosenItem, ai: enemy.item });
     chosenItem = null;
-    $('beltHint').innerHTML = [$('item1').value, $('item2').value]
-      .map((id) => `<strong>${ITEMS[id].name}:</strong> ${ITEMS[id].text}`).join(' ');
     render();
+    // If the result is above the screen (you were down at your hand), bring it
+    // into view just under the scoreboard; your hand sits right below it.
+    if ($('clash').getBoundingClientRect().top < $('score').getBoundingClientRect().bottom) {
+      const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      $('clash').scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+    }
   });
   $('pItems').addEventListener('click', (e) => {
     const btn = e.target.closest('button.item');
@@ -428,6 +484,7 @@
     render();
   });
   $('newGame').addEventListener('click', start);
+  $('banner').addEventListener('click', (e) => { if (e.target.id === 'again') start(); });
   // A new loadout only makes sense from round 1, so changing either one restarts.
   $('style').addEventListener('change', start);
   $('weapon').addEventListener('change', start);
