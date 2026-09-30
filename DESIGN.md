@@ -89,6 +89,27 @@ fighters carrying Battle Tonic (+2) won 44% and Healing Gourd (heal 5) 56%.
 Tonic +3 and Gourd 4 brought every item between 47% and 54%. Items shorten
 games slightly (about 8.8 rounds) and leave style balance intact (47-52%).
 
+## Duel stage
+
+Each round plays out on a stage above the result: two ink-silhouette fighters
+act out the cards (Strike lunges, Guard braces, Flow sidesteps, Crane in Still
+Water lifts into a one-legged counter, Broken Blade rushes all in), the loser
+recoils, damage floats up, and a guard break slumps the fighter under a brush
+stroke. Items have their own effects (a thrown knife, smoke, a firecracker
+burst, healing and posture numbers). The rest of the page updates at the moment
+of contact, so the numbers never give the result away early. A scene lasts
+about a second; tapping the stage skips it, and reduced motion skips the
+movement. It is presentation only: the rules and balance are unchanged.
+
+Each fighting style is a character, and the weapon is drawn in their hands:
+
+| Style | Character | Look |
+|---|---|---|
+| Balanced | The Wanderer | Wide straw hat |
+| Storm | The Tempest | Headband with trailing tails |
+| Stone | The Sentinel | Crested helmet, broad shoulder plates |
+| Stream | The Dancer | Long ponytail, slimmer build |
+
 ## Fighting styles
 
 A style is a 12-card list (11-card deck plus Broken Blade). You pick yours; the AI picks at random. Both
